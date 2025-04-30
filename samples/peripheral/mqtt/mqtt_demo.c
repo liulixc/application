@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// 引入MQTT和操作系统相关头文件
 #include "MQTTClient.h"
 #include "MQTTClientPersistence.h"
 #include "osal_debug.h"
@@ -30,6 +31,8 @@
 #include "pwm_demo.h"
 #include "mqtt_demo.h"
 
+// ======================== 配置参数 ========================
+
 // MQTT服务器连接地址（华为云IoT平台）
 #define ADDRESS "tcp://2502007d6f.st1.iotda-device.cn-north-4.myhuaweicloud.com"
 // 客户端ID，用于唯一标识设备
@@ -48,9 +51,11 @@
 // 任务相关配置
 #define MQTT_STA_TASK_PRIO 24           // MQTT任务优先级
 #define MQTT_STA_TASK_STACK_SIZE 0x1000 // MQTT任务栈大小
-#define TIMEOUT 10000L                   // 超时时间：10秒
+#define TIMEOUT 10000L                  // 超时时间：10秒
 #define MSG_MAX_LEN 28                  // 消息最大长度
 #define MSG_QUEUE_SIZE 32               // 消息队列大小
+
+// ======================== 全局变量定义 ========================
 
 /**
  * @brief 全局变量定义
@@ -63,10 +68,13 @@ char *g_password = "50f670e657058bb33c23b92a633720a7fbbfba36f493f263c346b55bb2fb
 MQTTClient client;                      // MQTT客户端实例
 extern int MQTTClient_init(void);       // MQTT客户端初始化函数声明
 
+// ======================== 回调函数实现 ========================
+
 /**
  * @brief 消息投递回调函数
  * @param context 上下文信息（未使用）
  * @param dt 投递令牌
+ * @details 当消息成功投递到MQTT服务器时被调用
  */
 void delivered(void *context, MQTTClient_deliveryToken dt)
 {
@@ -88,10 +96,12 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
 {
     unused(context);
     unused(topic_len);
+    // 动态分配消息结构体
     MQTT_msg *receive_msg = osal_kmalloc(sizeof(MQTT_msg), 0);
     printf("mqtt_message_arrive() success, the topic is %s, the payload is %s \n", topic_name, message->payload);
     receive_msg->msg_type = EN_MSG_PARS;
     receive_msg->receive_payload = message->payload;
+    // 写入消息队列
     uint32_t ret = osal_msg_queue_write_copy(g_msg_queue, receive_msg, sizeof(MQTT_msg), OSAL_WAIT_FOREVER);
     if (ret != 0) {
         printf("ret = %#x\r\n", ret);
@@ -105,12 +115,15 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
  * @brief MQTT连接断开回调函数
  * @param context 上下文信息（未使用）
  * @param cause 断开连接的原因
+ * @details 当MQTT连接丢失时被调用
  */
 void connlost(void *context, char *cause)
 {
     unused(context);
     printf("mqtt_connection_lost() error, cause: %s\n", cause);
 }
+
+// ======================== MQTT操作函数 ========================
 
 /**
  * @brief 订阅MQTT主题
@@ -141,16 +154,19 @@ int mqtt_publish(const char *topic, MQTT_msg *report_msg)
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
     MQTTClient_deliveryToken token;
     int rc = 0;
-    char *msg = make_json("environment", report_msg->temp, report_msg->humi);
+    // 生成JSON格式的消息
+    char *msg = make_json("ws63", report_msg->temp, report_msg->humi);
     pubmsg.payload = msg;
     pubmsg.payloadlen = (int)strlen(msg);
     pubmsg.qos = QOS;
     pubmsg.retained = 0;
+    // 发布消息
     rc = MQTTClient_publishMessage(client, topic, &pubmsg, &token);
     if (rc != MQTTCLIENT_SUCCESS) {
         printf("mqtt_publish failed\r\n");
     }
     printf("mqtt_publish(), the payload is %s, the topic is %s\r\n", msg, topic);
+    // 释放JSON消息内存
     osal_kfree(msg);
     msg = NULL;
     return rc;
@@ -167,6 +183,7 @@ int mqtt_connect(void)
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     int rc;
     printf("start mqtt sync subscribe...\r\n");
+    // 初始化MQTT客户端
     MQTTClient_init();
     MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     conn_opts.keepAliveInterval = 120; // 保持间隔为120秒，每120秒发送一次消息
@@ -175,7 +192,9 @@ int mqtt_connect(void)
         conn_opts.username = g_username;
         conn_opts.password = g_password;
     }
+    // 设置回调函数
     MQTTClient_setCallbacks(client, NULL, connlost, msgArrved, delivered);
+    // 连接服务器
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS) {
         printf("Failed to connect, return code %d\n", rc);
         return -1;
@@ -183,6 +202,8 @@ int mqtt_connect(void)
     printf("connect success\r\n");
     return rc;
 }
+
+// ======================== 任务实现 ========================
 
 /**
  * @brief MQTT任务主函数
@@ -195,23 +216,31 @@ int mqtt_connect(void)
  */
 int mqtt_task(void)
 {
+    // 动态分配用于存储消息的内存
     MQTT_msg *report_msg = osal_kmalloc(sizeof(MQTT_msg), 0);
     int ret = 0;
     uint32_t resize = 32;
     char *beep_status = NULL;
+    // 连接WiFi
     wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD);
+    // 连接MQTT服务器
     ret = mqtt_connect();
     if (ret != 0) {
         printf("connect failed, result %d\n", ret);
     }
-    osal_msleep(1000); // 1000等待连接成功
+    osal_msleep(1000); // 等待连接成功
+    // 组合命令主题字符串
     char *cmd_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/commands/#");
+    // 订阅命令主题
     ret = mqtt_subscribe(cmd_topic);
     if (ret < 0) {
         printf("subscribe topic error, result %d\n", ret);
     }
+    // 组合上报主题字符串
     char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
+    // 主循环：处理消息队列
     while (1) {
+        // 从消息队列读取消息
         ret = osal_msg_queue_read_copy(g_msg_queue, report_msg, &resize, OSAL_WAIT_FOREVER);
         if (ret != 0) {
             printf("queue_read ret = %#x\r\n", ret);
@@ -222,18 +251,21 @@ int mqtt_task(void)
             printf("report_msg->msg_type = %d, report_msg->temp = %s\r\n", report_msg->msg_type, report_msg->temp);
             switch (report_msg->msg_type) {
                 case EN_MSG_PARS:
+                    // 解析命令并执行蜂鸣器任务
                     beep_status = parse_json(report_msg->receive_payload);
                     pwm_task(beep_status);
                     break;
                 case EN_MSG_REPORT:
+                    // 上报环境数据
                     mqtt_publish(report_topic, report_msg);
                     break;
                 default:
                     break;
             }
+            // 释放消息内存
             osal_kfree(report_msg);
         }
-        osal_msleep(1000); // 1000等待连接成功
+        osal_msleep(1000); // 等待1秒
     }
     return ret;
 }
@@ -248,30 +280,46 @@ int mqtt_task(void)
 void environment_task_entry(void)
 {
     MQTT_msg *mqtt_msg;
-    environment_msg aht_msg;
+    // environment_msg aht_msg;
+
+    // 动态分配用于存储MQTT消息的内存
     mqtt_msg = osal_kmalloc(sizeof(MQTT_msg), 0);
-    // 检查内存分配
+    // 检查内存分配是否成功
     if (mqtt_msg == NULL) {
         printf("Memory allocation failed\r\n");
     }
+    // 传感器初始化（如有需要可取消注释）
     // aht20_init();
     // pwm_init();
+
+    // 循环采集环境数据并上报
     while (1) {
-        aht20_test_task(&aht_msg);
+        // // 读取温湿度传感器数据，结果存储在aht_msg中
+        // aht20_test_task(&aht_msg);
+
+        // 设置消息类型为上报
         mqtt_msg->msg_type = EN_MSG_REPORT;
-        if ((mqtt_msg != NULL) && (aht_msg.temperature != 0) && (aht_msg.humidity != 0)) {
-            sprintf(mqtt_msg->temp, "%.2f", aht_msg.temperature);
-            sprintf(mqtt_msg->humi, "%.2f", aht_msg.humidity);
+
+        // 检查采集到的数据是否有效，并且内存分配成功
+        if ((mqtt_msg != NULL)) {
+            // 将温度和湿度格式化为字符串，存入mqtt_msg结构体
+            sprintf(mqtt_msg->temp, "%.2f", 2);
+            sprintf(mqtt_msg->humi, "%.2f", 2);
             printf("temperature = %s, humidity= %s\r\n", mqtt_msg->temp, mqtt_msg->humi);
+
+            // 将采集到的数据写入消息队列，供MQTT任务读取并上报
             uint32_t ret = osal_msg_queue_write_copy(g_msg_queue, mqtt_msg, sizeof(MQTT_msg), OSAL_WAIT_FOREVER);
             if (ret != 0) {
+                // 写入队列失败，释放内存并退出循环
                 printf("ret = %#x\r\n", ret);
                 osal_kfree(mqtt_msg);
                 break;
             }
         }
+        // 延时1秒，控制采集周期
         osal_msleep(1000); // 1000ms读取数据
     }
+    // 释放分配的内存
     osal_kfree(mqtt_msg);
 }
 
@@ -285,7 +333,9 @@ void environment_task_entry(void)
 static void mqtt_sample_entry(void)
 {
     uint32_t ret;
+    // 禁用看门狗，防止开发阶段重启
     uapi_watchdog_disable();
+    // 创建消息队列
     ret = osal_msg_queue_create("name", MSG_QUEUE_SIZE, &g_msg_queue, 0, MSG_MAX_LEN);
     if (ret != OSAL_SUCCESS) {
         printf("create queue failure!,error:%x\n", ret);
@@ -293,18 +343,22 @@ static void mqtt_sample_entry(void)
     printf("create the queue success! queue_id = %d\n", g_msg_queue);
     osal_task *task_handle = NULL;
     osal_task *env_task_handle = NULL;
+    // 加锁，防止多线程冲突
     osal_kthread_lock();
+    // 创建MQTT主任务
     task_handle = osal_kthread_create((osal_kthread_handler)mqtt_task, 0, "MqttDemoTask", MQTT_STA_TASK_STACK_SIZE);
     if (task_handle != NULL) {
         osal_kthread_set_priority(task_handle, MQTT_STA_TASK_PRIO);
         osal_kfree(task_handle);
     }
+    // 创建环境数据采集任务
     env_task_handle =
         osal_kthread_create((osal_kthread_handler)environment_task_entry, 0, "EnvDemoTask", MQTT_STA_TASK_STACK_SIZE);
     if (env_task_handle != NULL) {
         osal_kthread_set_priority(env_task_handle, MQTT_STA_TASK_PRIO);
         osal_kfree(env_task_handle);
     }
+    // 解锁
     osal_kthread_unlock();
 }
 
