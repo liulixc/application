@@ -117,5 +117,10 @@ endif()
 if(DEFINED CONFIG_SAMPLE_SUPPORT_MQTT)
     add_subdirectory_if_exist(mqtt)
 endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_OLED)
+    add_subdirectory_if_exist(oled)
+endif()
+
 set(PUBLIC_HEADER "${PUBLIC_HEADER}" ${HEADER_LIST} PARENT_SCOPE)
 set(SOURCES "${SOURCES}" PARENT_SCOPE)

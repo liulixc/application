@@ -26,8 +26,7 @@
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
 #include "cjson_demo.h"
-#include "aht20_test.h"
-#include "aht20.h"
+#include "ssd1306_uilts.h"
 #include "pwm_demo.h"
 #include "mqtt_demo.h"
 
@@ -155,7 +154,7 @@ int mqtt_publish(const char *topic, MQTT_msg *report_msg)
     MQTTClient_deliveryToken token;
     int rc = 0;
     // 生成JSON格式的消息
-    char *msg = make_json("ws63", report_msg->temp, report_msg->humi);
+    char *msg = make_json("ws63", report_msg->temperature, report_msg->current);
     pubmsg.payload = msg;
     pubmsg.payloadlen = (int)strlen(msg);
     pubmsg.qos = QOS;
@@ -248,7 +247,7 @@ int mqtt_task(void)
             break;
         }
         if (report_msg != NULL) {
-            printf("report_msg->msg_type = %d, report_msg->temp = %s\r\n", report_msg->msg_type, report_msg->temp);
+            printf("report_msg->msg_type = %d, report_msg->temp = %s\r\n", report_msg->msg_type, report_msg->temperature);
             switch (report_msg->msg_type) {
                 case EN_MSG_PARS:
                     // 解析命令并执行蜂鸣器任务
@@ -280,7 +279,7 @@ int mqtt_task(void)
 void environment_task_entry(void)
 {
     MQTT_msg *mqtt_msg;
-    // environment_msg aht_msg;
+    environment_msg env_msg;
 
     // 动态分配用于存储MQTT消息的内存
     mqtt_msg = osal_kmalloc(sizeof(MQTT_msg), 0);
@@ -289,13 +288,13 @@ void environment_task_entry(void)
         printf("Memory allocation failed\r\n");
     }
     // 传感器初始化（如有需要可取消注释）
-    // aht20_init();
-    // pwm_init();
+    ssd1306_up_init();
+    pwm_init();
 
     // 循环采集环境数据并上报
     while (1) {
-        // // 读取温湿度传感器数据，结果存储在aht_msg中
-        // aht20_test_task(&aht_msg);
+        // // 读取数据，结果存储在env_msg中
+        get_environment_task(&env_msg);
 
         // 设置消息类型为上报
         mqtt_msg->msg_type = EN_MSG_REPORT;
@@ -303,9 +302,11 @@ void environment_task_entry(void)
         // 检查采集到的数据是否有效，并且内存分配成功
         if ((mqtt_msg != NULL)) {
             // 将温度和湿度格式化为字符串，存入mqtt_msg结构体
-            sprintf(mqtt_msg->temp, "%.2f", 2);
-            sprintf(mqtt_msg->humi, "%.2f", 2);
-            printf("temperature = %s, humidity= %s\r\n", mqtt_msg->temp, mqtt_msg->humi);
+            sprintf(mqtt_msg->temperature, "%.2f", env_msg.temperature); // 这里使用了float类型的格式化输出
+            // sprintf(mqtt_msg->humidity, "%.2f", env_msg.humidity);//这个地方原本写一个整形不可以，可能是因为前面是float类型的原因
+            sprintf(mqtt_msg->current, "%.2f", env_msg.current); // 这里使用了float类型的格式化输出
+
+            printf("temperature = %s,current=%s \r\n", mqtt_msg->temperature,mqtt_msg->current);
 
             // 将采集到的数据写入消息队列，供MQTT任务读取并上报
             uint32_t ret = osal_msg_queue_write_copy(g_msg_queue, mqtt_msg, sizeof(MQTT_msg), OSAL_WAIT_FOREVER);

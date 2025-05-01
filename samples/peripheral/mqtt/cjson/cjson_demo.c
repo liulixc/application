@@ -52,7 +52,7 @@ char *combine_strings(int str_amount, char *str1, ...)
     return result; // 返回拼接后的字符串
 }
 
-char *make_json(char *service_id, char *temperature, char *humidity)
+char *make_json(char *service_id, char *temperature, char *current)
 {
     // 创建 JSON 对象
     cJSON *root = cJSON_CreateObject();
@@ -65,7 +65,7 @@ char *make_json(char *service_id, char *temperature, char *humidity)
     // 创建 properties 对象
     cJSON *properties = cJSON_CreateObject();
     cJSON_AddStringToObject(properties, "temperature", temperature);
-    cJSON_AddStringToObject(properties, "humidity", humidity);
+    cJSON_AddStringToObject(properties, "current", current);
 
     // 将 properties 添加到 service
     cJSON_AddItemToObject(service, "properties", properties);

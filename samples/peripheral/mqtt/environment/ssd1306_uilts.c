@@ -19,9 +19,8 @@
 #include "ssd1306_fonts.h"
 #include "ssd1306.h"
 #include "soc_osal.h"
-#include "aht20.h"
 #include "app_init.h"
-#include "aht20_test.h"
+#include "ssd1306_uilts.h"
 
 #define CONFIG_I2C_SCL_MASTER_PIN 15
 #define CONFIG_I2C_SDA_MASTER_PIN 16
@@ -35,6 +34,7 @@
 const unsigned char HEAD_SIZE[] = {64, 64};
 static char g_templine[32] = {0};
 static char g_humiline[32] = {0};
+static char g_currentline[32] = {0};
 
 void app_i2c_init_pin(void)
 {
@@ -83,7 +83,7 @@ void temp_hum_chinese(void)
     }
 }
 
-void aht20_init(void)
+void ssd1306_up_init(void)
 {
     uint32_t baudrate = I2C_SET_BANDRATE;
     uint32_t hscode = I2C_MASTER_ADDR;
@@ -95,31 +95,30 @@ void aht20_init(void)
     ssd1306_init();
     ssd1306_fill(BLACK);
     ssd1306_set_cursor(0, 0);
-    while (aht20_calibrate() != 0) {
-        printf("AHT20 sensor init failed!\r\n");
-        osal_mdelay(100); // 100ms在判断设备是否复位成功
-    }
 }
 
-void aht20_test_task(environment_msg *msg)
+void get_environment_task(environment_msg *msg)
 {
-    temp_hum_chinese();
-    errcode_t retval = aht20_start_measure();
-    retval = aht20_get_measure_result(&msg->temperature, &msg->humidity);
-    if (retval != 0) {
-        printf("get humidity data failed!\r\n");
-    }
+    // temp_hum_chinese();
     ssd1306_set_cursor(32, 8); /* x坐标为32，y轴坐标为8 */
-    int ret = sprintf(g_templine, ": %.2f", msg->temperature);
-    if (ret < 0) {
-        printf("temp failed\r\n");
+    msg->temperature++;
+    if(msg->temperature > 100) {
+        msg->temperature = 0;
     }
+    msg->humidity++;
+    if(msg->humidity > 100) {
+        msg->humidity = 0;
+    }
+    msg->current++;
+    if(msg->current > 100) {
+        msg->current = 0;
+    }
+    sprintf(g_templine, "%.2f", msg->temperature);
+    sprintf(g_humiline, "%.2f", msg->humidity);
+    sprintf(g_currentline, "%.2f", msg->current);
     ssd1306_draw_string(g_templine, g_font_7x10, WHITE);
-    ret = sprintf(g_humiline, ": %.2f", msg->humidity);
-    if (ret < 0) {
-        printf("humi failed\r\n");
-    }
     ssd1306_set_cursor(32, 40); /* x坐标为32，y轴坐标为40 */
-    ssd1306_draw_string(g_humiline, g_font_7x10, WHITE);
+    // ssd1306_draw_string(g_humiline, g_font_7x10, WHITE);
+    ssd1306_draw_string(g_currentline, g_font_7x10, WHITE);
     ssd1306_update_screen();
 }

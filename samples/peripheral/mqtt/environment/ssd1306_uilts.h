@@ -22,10 +22,12 @@
 typedef struct {
     float temperature; // 温度
     float humidity;    // 湿度
+    float current;     // 电流
+    float voltage;     // 电压
 } environment_msg;
 
-void aht20_test_task(environment_msg *msg);
+void get_environment_task(environment_msg *msg);
 void temp_hum_chinese(void);
-void aht20_init(void);
+void ssd1306_up_init(void);
 
 #endif // AHT20_H

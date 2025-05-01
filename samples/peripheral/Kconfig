@@ -412,3 +412,11 @@ config SAMPLE_SUPPORT_MQTT
     depends on ENABLE_PERIPHERAL_SAMPLE
     help
         This option means support MQTT Sample.
+
+config SAMPLE_SUPPORT_OLED
+    bool
+    prompt "Support OLED Sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support OLED Sample.
