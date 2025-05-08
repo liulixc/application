@@ -420,3 +420,105 @@ config SAMPLE_SUPPORT_OLED
     depends on ENABLE_PERIPHERAL_SAMPLE
     help
         This option means support OLED Sample.
+
+config SAMPLE_SUPPORT_SLE_DISTRIBUTE_NETWORK
+    bool
+    prompt "Support SLE_DISTRIBUTE_NETWORK Sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support SLE_DISTRIBUTE_NETWORK Sample.
+
+if SAMPLE_SUPPORT_SLE_DISTRIBUTE_NETWORK
+menu "SLE_DISTRIBUTE_NETWORK Sample Configuration"
+    osource "application/samples/peripheral/sle_distribute_network/Kconfig"
+endmenu
+endif
+
+config SAMPLE_SUPPORT_SLE_THROUGHPUT
+    bool
+    prompt "Support SLE_THROUGHPUT Sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support SLE_THROUGHPUT Sample.
+
+if SAMPLE_SUPPORT_SLE_THROUGHPUT
+menu "SLE_THROUGHPUT Sample Configuration"
+    osource "application/samples/peripheral/sle_throughput/Kconfig"
+endmenu
+endif
+
+config SAMPLE_SUPPORT_UARTDEMO
+    bool
+    prompt "Support UARTDEMO Sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support UARTDEMO Sample.
+
+config SAMPLE_SUPPORT_GYRO
+    bool
+    prompt "Support GYRO Sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support GYRO Sample.
+
+config SAMPLE_SUPPORT_BLE_UART
+    bool
+    prompt "Support BLE UART sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support BLE UART Sample.
+
+if SAMPLE_SUPPORT_BLE_UART
+menu "BLE UART Sample Configuration"
+    osource "application/samples/peripheral/ble_uart/Kconfig"
+endmenu
+endif
+
+
+
+config SAMPLE_SUPPORT_SLE_UART
+    bool
+    prompt "Support SLE UART sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support SLE UART Sample.
+
+if SAMPLE_SUPPORT_SLE_UART
+menu "SLE UART Sample Configuration"
+    osource "application/samples/peripheral/sle_uart/Kconfig"
+endmenu
+endif
+
+config SAMPLE_SUPPORT_SLE_UART_1_VS_8
+    bool
+    prompt "Support SLE UART 1 vs 8 sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support SLE UART  1 vs 8  Sample.
+
+if SAMPLE_SUPPORT_SLE_UART_1_VS_8
+menu "SLE UART  1 vs 8  Sample Configuration"
+    osource "application/samples/peripheral/sle_uart_1_vs_8/Kconfig"
+endmenu
+endif
+
+config SAMPLE_SUPPORT_SLE_GETAWAY
+    bool
+    prompt "Support SLE GATEWAY sample."
+    default n
+    depends on ENABLE_PERIPHERAL_SAMPLE
+    help
+        This option means support SLE GATEWAY Sample.
+
+if SAMPLE_SUPPORT_SLE_GETAWAY
+menu "SLE GATEWAY Sample Configuration"
+    osource "application/samples/peripheral/sle_gateway/Kconfig"
+endmenu
+endif

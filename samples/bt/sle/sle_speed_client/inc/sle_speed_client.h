@@ -14,40 +14,22 @@
 #define SLE_CLIENT_ADV_H
 
 /**
- * @if Eng
- * @brief  sle uuid client init.
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li NULL
- * @else
- * @brief  sle uuid客户端初始化。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li NULL
- * @endif
+ * @brief SLE UUID客户端初始化接口
+ *
+ * @param notification_cb   通知回调函数
+ * @param indication_cb     指示回调函数
+ * @return 无
+ *
+ * 用于初始化SLE客户端，注册通知和指示回调。
  */
 void sle_client_init(ssapc_notification_callback notification_cb, ssapc_indication_callback indication_cb);
 
 /**
- * @if Eng
- * @brief  sle start scan.
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li NULL
- * @else
- * @brief  sle启动扫描。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li NULL
- * @endif
+ * @brief 启动SLE扫描
+ *
+ * @return 无
+ *
+ * 用于启动SLE设备的扫描流程。
  */
 void sle_start_scan(void);
 

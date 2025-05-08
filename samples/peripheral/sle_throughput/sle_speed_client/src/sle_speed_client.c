@@ -10,7 +10,6 @@
 #include "securec.h"
 #include "soc_osal.h"
 #include "common_def.h"
-
 #include "sle_device_discovery.h"
 #include "sle_connection_manager.h"
 #include "sle_ssap_client.h"
@@ -31,29 +30,25 @@
 #define SPEED_DEFAULT_SCAN_INTERVAL 400
 #define SPEED_DEFAULT_SCAN_WINDOW 20
 
-// 全局变量定义
-static int g_recv_pkt_num = 0;                // 接收包计数
-static uint64_t g_count_before_get_us;        // 接收前时间戳
-static uint64_t g_count_after_get_us;         // 接收后时间戳
+static int g_recv_pkt_num = 0;
+static uint64_t g_count_before_get_us;
+static uint64_t g_count_after_get_us;
 
 #ifdef CONFIG_LARGE_THROUGHPUT_CLIENT
 #define RECV_PKT_CNT 1000
 #else
 #define RECV_PKT_CNT 1
 #endif
-static int g_rssi_sum = 0;                    // RSSI累加
-static int g_rssi_number = 0;                 // RSSI计数
+static int g_rssi_sum = 0;
+static int g_rssi_number = 0;
 
-static sle_announce_seek_callbacks_t g_seek_cbk = {0}; // 扫描相关回调
-static sle_connection_callbacks_t    g_connect_cbk = {0}; // 连接相关回调
-static ssapc_callbacks_t             g_ssapc_cbk = {0};   // SSAP Client回调
-static sle_addr_t                    g_remote_addr = {0}; // 远端设备地址
-static uint16_t                      g_conn_id = 0;       // 当前连接ID
-static ssapc_find_service_result_t   g_find_service_result = {0}; // 服务发现结果
+static sle_announce_seek_callbacks_t g_seek_cbk = {0};
+static sle_connection_callbacks_t    g_connect_cbk = {0};
+static ssapc_callbacks_t             g_ssapc_cbk = {0};
+static sle_addr_t                    g_remote_addr = {0};
+static uint16_t                      g_conn_id = 0;
+static ssapc_find_service_result_t   g_find_service_result = {0};
 
-/**
- * @brief SLE使能回调，成功后启动扫描
- */
 void sle_sample_sle_enable_cbk(errcode_t status)
 {
     if (status == 0) {
@@ -61,9 +56,6 @@ void sle_sample_sle_enable_cbk(errcode_t status)
     }
 }
 
-/**
- * @brief 扫描使能回调
- */
 void sle_sample_seek_enable_cbk(errcode_t status)
 {
     if (status == 0) {
@@ -71,9 +63,6 @@ void sle_sample_seek_enable_cbk(errcode_t status)
     }
 }
 
-/**
- * @brief 扫描禁用回调，停止后尝试连接目标设备
- */
 void sle_sample_seek_disable_cbk(errcode_t status)
 {
     if (status == 0) {
@@ -81,9 +70,6 @@ void sle_sample_seek_disable_cbk(errcode_t status)
     }
 }
 
-/**
- * @brief 扫描结果回调，发现目标设备后停止扫描
- */
 void sle_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_data)
 {
     if (seek_result_data != NULL) {
@@ -95,25 +81,16 @@ void sle_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_data)
     }
 }
 
-/**
- * @brief 获取浮点数整数部分
- */
 static uint32_t get_float_int(float in)
 {
     return (uint32_t)(((uint64_t)(in * SLE_SPEED_HUNDRED)) / SLE_SPEED_HUNDRED);
 }
 
-/**
- * @brief 获取浮点数小数部分
- */
 static uint32_t get_float_dec(float in)
 {
     return (uint32_t)(((uint64_t)(in * SLE_SPEED_HUNDRED)) % SLE_SPEED_HUNDRED);
 }
 
-/**
- * @brief 通知回调，统计吞吐量并打印速率
- */
 static void sle_speed_notification_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
     errcode_t status)
 {
@@ -138,9 +115,6 @@ static void sle_speed_notification_cb(uint8_t client_id, uint16_t conn_id, ssapc
     g_recv_pkt_num++;
 }
 
-/**
- * @brief 指示回调，打印接收到的数据
- */
 static void sle_speed_indication_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
     errcode_t status)
 {
@@ -150,9 +124,6 @@ static void sle_speed_indication_cb(uint8_t client_id, uint16_t conn_id, ssapc_h
     osal_printk("\n sle_speed_indication_cb sle uart recived data : %s\r\n", data->data);
 }
 
-/**
- * @brief 注册扫描相关回调
- */
 void sle_sample_seek_cbk_register(void)
 {
     g_seek_cbk.sle_enable_cb = sle_sample_sle_enable_cbk;
@@ -161,9 +132,6 @@ void sle_sample_seek_cbk_register(void)
     g_seek_cbk.seek_result_cb = sle_sample_seek_result_info_cbk;
 }
 
-/**
- * @brief 连接状态变化回调，连接成功后发起配对
- */
 void sle_sample_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason)
 {
@@ -178,9 +146,6 @@ void sle_sample_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
     }
 }
 
-/**
- * @brief 配对完成回调，成功后发起MTU协商
- */
 void sle_sample_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
 {
     osal_printk("[ssap client] pair complete conn_id:%d, addr:%02x***%02x%02x\n", conn_id, addr->addr[0],
@@ -193,18 +158,12 @@ void sle_sample_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errc
     }
 }
 
-/**
- * @brief 连接参数更新回调
- */
 void sle_sample_update_cbk(uint16_t conn_id, errcode_t status, const sle_connection_param_update_evt_t *param)
 {
     unused(status);
     osal_printk("[ssap client] updat state changed conn_id:%d, interval = %02x\n", conn_id, param->interval);
 }
 
-/**
- * @brief 连接参数更新请求回调
- */
 void sle_sample_update_req_cbk(uint16_t conn_id, errcode_t status, const sle_connection_param_update_req_t *param)
 {
     unused(conn_id);
@@ -213,9 +172,6 @@ void sle_sample_update_req_cbk(uint16_t conn_id, errcode_t status, const sle_con
         param->interval_min, param->interval_max);
 }
 
-/**
- * @brief 读取RSSI回调，统计平均RSSI
- */
 void sle_sample_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
 {
     unused(conn_id);
@@ -229,9 +185,6 @@ void sle_sample_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
     }
 }
 
-/**
- * @brief 注册连接相关回调
- */
 void sle_sample_connect_cbk_register(void)
 {
     g_connect_cbk.connect_state_changed_cb = sle_sample_connect_state_changed_cbk;
@@ -241,9 +194,6 @@ void sle_sample_connect_cbk_register(void)
     g_connect_cbk.read_rssi_cb = sle_sample_read_rssi_cbk;
 }
 
-/**
- * @brief MTU协商完成回调，发起服务发现
- */
 void sle_sample_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exchange_info_t *param,
     errcode_t status)
 {
@@ -258,9 +208,6 @@ void sle_sample_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exch
     ssapc_find_structure(0, conn_id, &find_param);
 }
 
-/**
- * @brief 服务发现回调，保存服务句柄
- */
 void sle_sample_find_structure_cbk(uint8_t client_id, uint16_t conn_id, ssapc_find_service_result_t *service,
     errcode_t status)
 {
@@ -281,9 +228,6 @@ void sle_sample_find_structure_cbk(uint8_t client_id, uint16_t conn_id, ssapc_fi
     memcpy_s(&g_find_service_result.uuid, sizeof(sle_uuid_t), &service->uuid, sizeof(sle_uuid_t));
 }
 
-/**
- * @brief 结构体发现完成回调，发起写请求
- */
 void sle_sample_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
     ssapc_find_structure_result_t *structure_result, errcode_t status)
 {
@@ -308,9 +252,6 @@ void sle_sample_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
     ssapc_write_req(0, conn_id, &param);
 }
 
-/**
- * @brief 属性发现回调
- */
 void sle_sample_find_property_cbk(uint8_t client_id, uint16_t conn_id,
     ssapc_find_property_result_t *property, errcode_t status)
 {
@@ -332,9 +273,6 @@ void sle_sample_find_property_cbk(uint8_t client_id, uint16_t conn_id,
     }
 }
 
-/**
- * @brief 写确认回调，收到写确认后发起读请求
- */
 void sle_sample_write_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_write_result_t *write_result,
     errcode_t status)
 {
@@ -342,9 +280,6 @@ void sle_sample_write_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_write_r
     ssapc_read_req(0, conn_id, write_result->handle, write_result->type);
 }
 
-/**
- * @brief 读确认回调，打印读到的数据
- */
 void sle_sample_read_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *read_data,
     errcode_t status)
 {
@@ -357,9 +292,6 @@ void sle_sample_read_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_v
     }
 }
 
-/**
- * @brief 注册SSAP Client相关回调
- */
 void sle_sample_ssapc_cbk_register(ssapc_notification_callback notification_cb,
     ssapc_notification_callback indication_cb)
 {
@@ -373,9 +305,6 @@ void sle_sample_ssapc_cbk_register(ssapc_notification_callback notification_cb,
     g_ssapc_cbk.indication_cb = indication_cb;
 }
 
-/**
- * @brief 初始化SLE连接参数
- */
 void sle_speed_connect_param_init(void)
 {
     sle_default_connect_param_t param = {0};
@@ -390,9 +319,6 @@ void sle_speed_connect_param_init(void)
     sle_default_connection_param_set(&param);
 }
 
-/**
- * @brief SLE客户端初始化，注册所有回调并使能SLE
- */
 void sle_client_init(ssapc_notification_callback notification_cb, ssapc_indication_callback indication_cb)
 {
     uint8_t local_addr[SLE_ADDR_LEN] = {0x13, 0x67, 0x5c, 0x07, 0x00, 0x51};
@@ -410,9 +336,6 @@ void sle_client_init(ssapc_notification_callback notification_cb, ssapc_indicati
     sle_set_local_addr(&local_address);
 }
 
-/**
- * @brief 启动SLE扫描
- */
 void sle_start_scan()
 {
     sle_seek_param_t param = {0};
@@ -427,9 +350,6 @@ void sle_start_scan()
     sle_start_seek();
 }
 
-/**
- * @brief SLE速度测试主任务，初始化并启动SLE客户端
- */
 int sle_speed_init(void)
 {
     osal_msleep(1000);  /* sleep 1000ms */
@@ -439,9 +359,6 @@ int sle_speed_init(void)
 
 #define SLE_SPEED_TASK_PRIO 26
 #define SLE_SPEED_STACK_SIZE 0x2000
-/**
- * @brief SLE速度测试入口，创建主任务
- */
 static void sle_speed_entry(void)
 {
     osal_task *task_handle = NULL;
@@ -454,5 +371,5 @@ static void sle_speed_entry(void)
     osal_kthread_unlock();
 }
 
-/* 启动SLE速度测试入口 */
+/* Run the blinky_entry. */
 app_run(sle_speed_entry);

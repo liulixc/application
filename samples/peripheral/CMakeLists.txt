@@ -122,5 +122,37 @@ if(DEFINED CONFIG_SAMPLE_SUPPORT_OLED)
     add_subdirectory_if_exist(oled)
 endif()
 
+if(DEFINED CONFIG_SAMPLE_SUPPORT_SLE_DISTRIBUTE_NETWORK)
+    add_subdirectory_if_exist(sle_distribute_network)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_SLE_THROUGHPUT)
+    add_subdirectory_if_exist(sle_throughput)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_UARTDEMO)
+    add_subdirectory_if_exist(uart_demo)
+endif()
+    
+if(DEFINED CONFIG_SAMPLE_SUPPORT_GYRO)
+    add_subdirectory_if_exist(gyro)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_SLE_UART)
+    add_subdirectory_if_exist(sle_uart)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_SLE_UART_1_VS_8)
+    add_subdirectory_if_exist(sle_uart_1_vs_8)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_BLE_UART)
+    add_subdirectory_if_exist(ble_uart)
+endif()
+
+if(DEFINED CONFIG_SAMPLE_SUPPORT_SLE_GETAWAY)
+    add_subdirectory_if_exist(sle_gateway)
+endif()
+
 set(PUBLIC_HEADER "${PUBLIC_HEADER}" ${HEADER_LIST} PARENT_SCOPE)
 set(SOURCES "${SOURCES}" PARENT_SCOPE)
