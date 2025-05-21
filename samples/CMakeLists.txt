@@ -29,6 +29,12 @@ endif()
 if(DEFINED CONFIG_ENABLE_NFC_SAMPLE)
     add_subdirectory_if_exist(nfc) # 添加NFC样例
 endif()
+if(DEFINED CONFIG_ENABLE_FARSIGHT_SAMPLE)
+    add_subdirectory_if_exist(Farsight) # 添加华清远见样例
+endif()
+if(DEFINED CONFIG_ENABLE_BMS_SAMPLE)
+    add_subdirectory_if_exist(BMS) # 添加电池管理样例
+endif()
 
 add_subdirectory_if_exist(custom) # 总是添加自定义样例目录
 
@@ -69,5 +75,7 @@ install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/radar" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/nfc" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/bt/ble" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/bt/sle" "*")
+install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/Farsight" "*")
+install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/BMS" "*")
 
 build_component() # 构建该组件

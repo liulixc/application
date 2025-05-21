@@ -14,7 +14,7 @@
 #include "app_init.h"
 #include "tcxo.h"
  
-#define DELAY_10000MS                   10000
+#define DELAY_1000MS                   1000
 #define CYCLES                          10
 #define ADC_TASK_PRIO                   26
 #define ADC_TASK_STACK_SIZE             0x1000
@@ -27,10 +27,11 @@ static void *adc_task(const char *arg)
     uint8_t adc_channel = CONFIG_ADC_CHANNEL;
     uint16_t voltage = 0;
     uint32_t cnt = 0;
-    while (cnt++ < CYCLES) {
+    // while (cnt++ < CYCLES) {
+    while (1) {
         adc_port_read(adc_channel, &voltage);
         osal_printk("voltage: %d mv\r\n", voltage);
-        osal_msleep(DELAY_10000MS);
+        osal_msleep(DELAY_1000MS);
     }
     /* 当前测量的电压值和实际值可能有较大差别，请确认是否有分压电阻，如果有分压电阻，则差别符合预期 */
     uapi_adc_deinit();

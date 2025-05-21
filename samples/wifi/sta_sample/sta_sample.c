@@ -1,10 +1,26 @@
 /**
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2022-2023. All rights reserved.
+ * @file sta_sample.c
+ * @brief Wi-Fi STA模式连接样例主流程实现文件
  *
- * Description: Application core main function for standard \n
+ * 本文件实现了Wi-Fi STA模式下的扫描、连接、DHCP获取IP等主要流程，
+ * 包括事件回调注册、目标AP筛选、连接状态与DHCP状态检测等。
+ * 适用于HiSilicon平台的Wi-Fi连接样例。
  *
- * History: \n
- * 2022-07-27, Create file. \n
+ * 主要流程：
+ * 1. 注册Wi-Fi事件回调，等待Wi-Fi初始化完成。
+ * 2. 启动扫描，筛选目标AP。
+ * 3. 连接目标AP，获取IP地址。
+ * 4. 检查连接与DHCP状态。
+ *
+ * 主要函数说明：
+ * - wifi_scan_state_changed：扫描完成事件回调。
+ * - wifi_connection_changed：连接状态变化事件回调。
+ * - example_get_match_network：筛选目标AP并填充连接参数。
+ * - example_check_connect_status：查询STA连接状态。
+ * - example_check_dhcp_status：查询DHCP分配IP状态。
+ * - example_sta_function：STA连接主流程。
+ * - sta_sample_init：对外提供的Wi-Fi连接样例初始化接口。
+ * - sta_sample_entry：创建STA样例任务入口。
  */
 
 #include "lwip/netifapi.h"
@@ -31,13 +47,9 @@
 #define WIFI_TASK_DURATION_MS           2000
 #define WIFI_TASK_STACK_SIZE            0x1000
 
-static td_void wifi_scan_state_changed(td_s32 state, td_s32 size);
-static td_void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru *info, td_s32 reason_code);
 
-wifi_event_stru wifi_event_cb = {
-    .wifi_event_connection_changed      = wifi_connection_changed,
-    .wifi_event_scan_state_changed      = wifi_scan_state_changed,
-};
+
+
 
 enum {
     WIFI_STA_SAMPLE_INIT = 0,       /* 0:初始态 */
@@ -51,9 +63,49 @@ enum {
 
 static td_u8 g_wifi_state = WIFI_STA_SAMPLE_INIT;
 
-/*****************************************************************************
-  STA 扫描事件回调函数
-*****************************************************************************/
+
+/*                           函数声明                           */                        
+
+//STA扫描事件回调函数声明
+static td_void wifi_scan_state_changed(td_s32 state, td_s32 size);
+
+//STA连接状态事件回调函数声明
+static td_void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru *info, td_s32 reason_code);
+
+//筛选扫描到的目标AP并填充连接参数声明
+td_s32 example_get_match_network(wifi_sta_config_stru *expected_bss);
+
+//查询STA连接状态声明
+td_bool example_check_connect_status(td_void);
+
+//查询DHCP分配IP状态声明
+td_bool example_check_dhcp_status(struct netif *netif_p, td_u32 *wait_count);
+
+// STA连接主流程声明
+td_s32 example_sta_function(td_void);
+
+//STA样例初始化入口声明，对外接口
+int sta_sample_init(void *param);
+
+//STA样例任务入口声明，创建线程
+static void sta_sample_entry(void);
+
+
+
+
+
+
+
+
+
+
+
+/**
+ * @brief STA扫描事件回调函数
+ * @param state 扫描状态
+ * @param size 扫描到的AP数量
+ * @note 扫描完成后设置全局状态为SCAN_DONE
+ */
 static td_void wifi_scan_state_changed(td_s32 state, td_s32 size)
 {
     UNUSED(state);
@@ -63,9 +115,13 @@ static td_void wifi_scan_state_changed(td_s32 state, td_s32 size)
     return;
 }
 
-/*****************************************************************************
-  STA 关联事件回调函数
-*****************************************************************************/
+/**
+ * @brief STA连接状态事件回调函数
+ * @param state 连接状态
+ * @param info 连接信息
+ * @param reason_code 失败原因码
+ * @note 连接成功或失败时设置全局状态
+ */
 static td_void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru *info, td_s32 reason_code)
 {
     UNUSED(info);
@@ -80,15 +136,24 @@ static td_void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru
     }
 }
 
-/*****************************************************************************
-  STA 匹配目标AP
-*****************************************************************************/
+
+wifi_event_stru wifi_event_cb = {
+    .wifi_event_connection_changed      = wifi_connection_changed,
+    .wifi_event_scan_state_changed      = wifi_scan_state_changed,
+};
+
+/**
+ * @brief 筛选扫描到的目标AP并填充连接参数
+ * @param expected_bss 期望连接的AP参数结构体
+ * @return 0: 成功, -1: 失败
+ * @note 先扫描所有AP，找到目标后填充expected_bss
+ */
 td_s32 example_get_match_network(wifi_sta_config_stru *expected_bss)
 {
     td_s32  ret;
     td_u32  num = 64; /* 64:扫描到的Wi-Fi网络数量 */
-    td_char expected_ssid[] = "my_softAP";
-    td_char key[] = "my_password"; /* 待连接的网络接入密码 */
+    td_char expected_ssid[] = "QQ";
+    td_char key[] = "tangyuan"; /* 待连接的网络接入密码 */
     td_bool find_ap = TD_FALSE;
     td_u8   bss_index;
     /* 获取扫描结果 */
@@ -136,9 +201,11 @@ td_s32 example_get_match_network(wifi_sta_config_stru *expected_bss)
     return 0;
 }
 
-/*****************************************************************************
-  STA 关联状态查询
-*****************************************************************************/
+/**
+ * @brief 查询STA连接状态
+ * @return 0: 连接成功, -1: 连接失败
+ * @note 最多查询5次，每次间隔500ms
+ */
 td_bool example_check_connect_status(td_void)
 {
     td_u8 index;
@@ -157,9 +224,13 @@ td_bool example_check_connect_status(td_void)
     return -1;
 }
 
-/*****************************************************************************
-  STA DHCP状态查询
-*****************************************************************************/
+/**
+ * @brief 查询DHCP分配IP状态
+ * @param netif_p 网络接口指针
+ * @param wait_count 等待计数器指针
+ * @return 0: DHCP成功, -1: 失败或超时
+ * @note 超时会重置状态，需重新连接
+ */
 td_bool example_check_dhcp_status(struct netif *netif_p, td_u32 *wait_count)
 {
     if ((ip_addr_isany(&(netif_p->ip_addr)) == 0) && (*wait_count <= WIFI_GET_IP_MAX_COUNT)) {
@@ -176,6 +247,11 @@ td_bool example_check_dhcp_status(struct netif *netif_p, td_u32 *wait_count)
     return -1;
 }
 
+/**
+ * @brief STA连接主流程
+ * @return 0: 成功, -1: 失败
+ * @note 包含扫描、连接、DHCP获取IP等完整流程
+ */
 td_s32 example_sta_function(td_void)
 {
     td_char ifname[WIFI_IFNAME_MAX_SIZE + 1] = "wlan0"; /* 创建的STA接口名 */
@@ -235,6 +311,12 @@ td_s32 example_sta_function(td_void)
     return 0;
 }
 
+/**
+ * @brief STA样例初始化入口，对外接口
+ * @param param 任务参数（未使用）
+ * @return 0: 成功, -1: 失败
+ * @note 注册事件回调，等待初始化，调用主流程
+ */
 int sta_sample_init(void *param)
 {
     param = param;
@@ -259,6 +341,10 @@ int sta_sample_init(void *param)
     return 0;
 }
 
+/**
+ * @brief STA样例任务入口，创建线程
+ * @note 创建sta_sample_task任务并启动
+ */
 static void sta_sample_entry(void)
 {
     osThreadAttr_t attr;

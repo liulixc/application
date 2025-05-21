@@ -1,0 +1,21 @@
+config SAMPLE_SUPPORT_BMS_SLAVE
+    bool
+    prompt "Support BMS_SLAVE Sample."
+    default n
+    depends on ENABLE_BMS_SAMPLE
+    help
+        This option means support BMS_SLAVE Sample.
+
+config SAMPLE_SUPPORT_BMS_GATEWAY
+    bool
+    prompt "Support BMS_GATEWAY Sample."
+    default n
+    depends on ENABLE_BMS_SAMPLE
+    help
+        This option means support BMS_GATEWAY Sample.
+
+if SAMPLE_SUPPORT_BMS_SLAVE
+menu "BMS Slave Sample Configuration"
+    osource "application/samples/BMS/bms_slave/Kconfig"
+endmenu
+endif

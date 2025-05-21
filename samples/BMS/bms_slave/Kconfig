@@ -1,0 +1,4 @@
+config ADC_CHANNEL
+    int
+    prompt "Choose ADC channel."
+    default 5

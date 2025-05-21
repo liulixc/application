@@ -74,3 +74,26 @@ config ENABLE_NFC_SAMPLE
 if ENABLE_NFC_SAMPLE
 osource "application/samples/nfc/Kconfig"
 endif
+
+config ENABLE_FARSIGHT_SAMPLE
+    bool
+    prompt "Enable the Sample of Farsight."
+    default n
+    depends on SAMPLE_ENABLE
+    help
+        This option means enable the sample of Farsight.
+
+if ENABLE_FARSIGHT_SAMPLE
+osource "application/samples/Farsight/Kconfig"
+endif
+
+config ENABLE_BMS_SAMPLE
+    bool
+    prompt "Enable the Sample of BMS."
+    default n
+    depends on SAMPLE_ENABLE
+    help
+        This option means enable the sample of BMS.
+if ENABLE_BMS_SAMPLE
+osource "application/samples/BMS/Kconfig"
+endif

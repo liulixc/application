@@ -2,7 +2,7 @@
  * @file SLE_LED_Server.c
  * @brief SLE LED服务端示例代码
  *
- * 本文件实现了基于SLE协议的LED控制服务端，支持通过BLE与客户端交互，实现LED灯的远程控制与状态同步。
+ * 本文件实现了基于SLE协议的LED控制服务端，支持通过SLE与客户端交互，实现LED灯的远程控制与状态同步。
  * 包含服务注册、属性添加、回调注册、LED控制任务等完整流程。
  */
 
@@ -223,51 +223,52 @@ static uint8_t sle_uuid_base[] = {0x37, 0xBE, 0xA8, 0x80, 0xFC, 0x70, 0x11, 0xEA
  */
 static int example_led_control_task(const char *arg)
 {
-    unused(arg);
-    // errcode_t ret = 0;
+    unused(arg); // 参数未使用，防止编译器告警
+    // 记录上一次LED操作类型，初始为关闭绿色LED
     example_control_led_type_t last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_GLED_OFF;
 
     PRINT("[SLE Server] start led control task\r\n");
 
+    // 无限循环，周期性切换LED状态
     while (1) {
-        (void)osal_msleep(500);
+        (void)osal_msleep(500); // 每500ms切换一次
+        // 按照状态机依次切换红、黄、绿LED的开关状态
         if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_GLED_OFF) {
+            // 发送红色LED打开的通知
             uint8_t write_req_data[] = {'R', 'L', 'E', 'D', '_', 'O', 'N'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_RLED_ON;
         } else if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_RLED_ON) {
+            // 发送红色LED关闭的通知
             uint8_t write_req_data[] = {'R', 'L', 'E', 'D', '_', 'O', 'F', 'F'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_RLED_OFF;
         } else if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_RLED_OFF) {
+            // 发送黄色LED打开的通知
             uint8_t write_req_data[] = {'Y', 'L', 'E', 'D', '_', 'O', 'N'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_YLED_ON;
         } else if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_YLED_ON) {
+            // 发送黄色LED关闭的通知
             uint8_t write_req_data[] = {'Y', 'L', 'E', 'D', '_', 'O', 'F', 'F'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_YLED_OFF;
         } else if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_YLED_OFF) {
+            // 发送绿色LED打开的通知
             uint8_t write_req_data[] = {'G', 'L', 'E', 'D', '_', 'O', 'N'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_GLED_ON;
         } else if (last_led_operation == EXAMPLE_CONTORL_LED_LEDBOARD_GLED_ON) {
+            // 发送绿色LED关闭的通知
             uint8_t write_req_data[] = {'G', 'L', 'E', 'D', '_', 'O', 'F', 'F'};
             example_sle_server_send_notify_by_handle(write_req_data, sizeof(write_req_data));
-
             last_led_operation = EXAMPLE_CONTORL_LED_LEDBOARD_GLED_OFF;
         }
+        // 每次循环只切换一次LED状态并通知客户端
     }
 
     return 0;
 }
-
-
 
 /**
  * @brief 创建LED控制任务
@@ -275,14 +276,16 @@ static int example_led_control_task(const char *arg)
 static void example_led_control_entry(void)
 {
     osal_task *task_handle = NULL;
-    osal_kthread_lock();
+    osal_kthread_lock(); // 进入临界区，防止多线程冲突
+    // 创建LED控制任务，任务函数为example_led_control_task
     task_handle = osal_kthread_create((osal_kthread_handler)example_led_control_task, 0, "LedControlTask",
                                       LED_CONTROL_TASK_STACK_SIZE);
     if (task_handle != NULL) {
+        // 设置任务优先级
         osal_kthread_set_priority(task_handle, LED_CONTROL_TASK_PRIO);
-        osal_kfree(task_handle);
+        osal_kfree(task_handle); // 释放任务句柄内存
     }
-    osal_kthread_unlock();
+    osal_kthread_unlock(); // 退出临界区
 }
 
 /**
@@ -291,12 +294,13 @@ static void example_led_control_entry(void)
  */
 static void example_print_led_state(ssaps_req_write_cb_t *write_cb_para)
 {
+    // 判断客户端写入的数据是否为"LED_ON"，并打印对应信息
     if (write_cb_para->length == strlen("LED_ON") && write_cb_para->value[0] == 'L' && write_cb_para->value[1] == 'E' &&
         write_cb_para->value[2] == 'D' && write_cb_para->value[3] == '_' && write_cb_para->value[4] == 'O' &&
         write_cb_para->value[5] == 'N') {
         PRINT("[SLE Server] client main board led is on.\r\n");
     }
-
+    // 判断客户端写入的数据是否为"LED_OFF"，并打印对应信息
     if (write_cb_para->length == strlen("LED_OFF") && write_cb_para->value[0] == 'L' &&
         write_cb_para->value[1] == 'E' && write_cb_para->value[2] == 'D' && write_cb_para->value[3] == '_' &&
         write_cb_para->value[4] == 'O' && write_cb_para->value[5] == 'F' && write_cb_para->value[6] == 'F') {
@@ -714,7 +718,7 @@ static int example_sle_led_server_task(const char *arg)
     if (example_sle_server_add() != ERRCODE_SUCC) {
         PRINT("[SLE Server] sle server add fail !\r\n");
         return -1;
-    }//注册Server，添加Service和Property（特征值），并启动Service（即注册GATT服务和特征）。
+    }//注册Server，添加Service和Property（特征值），并启动Service
 
     /* 设置设备公开，并公开设备 */
     if (example_sle_server_adv_init() != ERRCODE_SUCC) {//这个地方的函数是adv里的
