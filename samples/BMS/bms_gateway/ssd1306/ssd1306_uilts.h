@@ -20,10 +20,9 @@
 * 环境监测数据
 \***************************************************/
 typedef struct {
-    float temperature; // 温度
-    float humidity;    // 湿度
+    float temperature[5]; // 温度
     float current;     // 电流
-    float voltage;     // 电压
+    float voltage[12];     // 电压
 } environment_msg;
 
 void get_environment_task(environment_msg *msg);

@@ -66,7 +66,7 @@ enum {
     WIFI_STA_SAMPLE_GET_IP,       /* 6:获取IP */
 } g_wifi_state_enum;
 
-static td_u8 g_wifi_state = WIFI_STA_SAMPLE_INIT;
+static volatile td_u8 g_wifi_state = WIFI_STA_SAMPLE_INIT;
 
 /**
  * @brief STA扫描事件回调函数
@@ -220,10 +220,12 @@ td_bool example_check_dhcp_status(struct netif *netif_p, td_u32 *wait_count)
  */
 td_s32 example_sta_function(const char *ssid, const char *psk)
 {
-    td_char ifname[WIFI_IFNAME_MAX_SIZE + 1] = "wlan0"; /* 创建的STA接口名 */
-    wifi_sta_config_stru expected_bss = {0};            /* 连接请求信息 */
+    td_char ifname[WIFI_IFNAME_MAX_SIZE + 1] = "wlan0";
+    wifi_sta_config_stru expected_bss = {0};
+    g_wifi_state = WIFI_STA_SAMPLE_INIT;
     struct netif *netif_p = TD_NULL;
     td_u32 wait_count = 0;
+    // int max_retry = 1000; // 死循环加最大重试保护
 
     /* 创建STA接口 */
     if (wifi_sta_enable() != 0) {
@@ -231,8 +233,8 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
     }
     PRINT("%s::STA enable succ.\r\n", WIFI_STA_SAMPLE_LOG);
 
-    do {
-        (void)osDelay(1); /* 1: 等待10ms后判断状态 */
+    while (1) {
+        (void)osDelay(1);
         if (g_wifi_state == WIFI_STA_SAMPLE_INIT) 
         {
             PRINT("%s::Scan start!\r\n", WIFI_STA_SAMPLE_LOG);
@@ -281,13 +283,13 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
             if (example_check_dhcp_status(netif_p, &wait_count) == 0) 
             {
                 netifapi_netif_common(netif_p, dhcp_clients_info_show, NULL);
-                break;
+                return 0;
             }
             wait_count++;
         }
-    } while (1);
-
-    return 0;
+    }
+    PRINT("%s::WiFi connect timeout or failed!\r\n", WIFI_STA_SAMPLE_LOG);
+    return -1;
 }
 
 /**
@@ -318,3 +320,21 @@ int wifi_connect(const char *ssid, const char *psk)
     }
     return 0;
 }
+
+/**
+ * @brief 对外提供的Wi-Fi断开接口
+ * @return 0: 成功, -1: 失败
+ * @note 关闭STA接口，释放资源
+ */
+int wifi_disconnect(void)
+{
+    int ret = wifi_sta_disable();
+    g_wifi_state = WIFI_STA_SAMPLE_INIT; // 断开时清理状态
+    if (ret != 0) {
+        PRINT("%s::wifi_sta_disable fail.\r\n", WIFI_STA_SAMPLE_LOG);
+        return -1;
+    }
+    PRINT("%s::wifi disconnect succ.\r\n", WIFI_STA_SAMPLE_LOG);
+    return 0;
+}
+

@@ -11,7 +11,9 @@
 #define WIFI_CONNECT_H
 
 #include <stdint.h>
+#include <td_type.h>
 
 int wifi_connect(const char *ssid, const char *psk);
-
+int wifi_disconnect(void);
+td_s32 example_sta_function(const char *ssid, const char *psk);
 #endif

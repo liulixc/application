@@ -1052,38 +1052,17 @@ void *bms_salve_task(void)
         // osal_mdelay(10);
         // printf("T5:%d \r\n",(int)gpiocode[0][4]);
 
-        // 构建 cell_voltages 数组
-        cJSON *cell_voltages = cJSON_CreateArray();
-        for (int i = 0; i < 12; i++) {
-            cJSON_AddItemToArray(cell_voltages, cJSON_CreateNumber(cell_codes[0][i]));
-        }
-        // 构建 temperatures 数组
-        cJSON *temperatures = cJSON_CreateArray();
-        for (int i = 0; i < 5; i++) {
-            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(gpiocode[0][i]));
-        }
-        // 构建根对象
-        cJSON *root = cJSON_CreateObject();
-        cJSON_AddNumberToObject(root, "MOD_VOL", MOD_VOL);
-        cJSON_AddItemToObject(root, "cell_voltages", cell_voltages);
-        cJSON_AddItemToObject(root, "temperatures", temperatures);
-        cJSON_AddNumberToObject(root, "VREF2", gpiocode[0][5]);
-        cJSON_AddNumberToObject(root, "Read_GPIO", a);
-        cJSON_AddNumberToObject(root, "Read_Voltage", r);
-        
-        // 打印格式JSON
-        char *json_str = cJSON_Print(root);
-        printf("BMS_JSON:%s\n", json_str);
-        
-        //构建 JSON 字符串后
+        // 构建BMS JSON字符串，返回json字符串指针和长度，需外部free
+
+
+        // 构建 JSON 字符串后
+        int json_len = 0;
+        char *json_str = build_and_print_bms_json(cell_codes, gpiocode, MOD_VOL, &json_len);
         msg_data_t msg = {0};
         msg.value = json_str;         // 指向 JSON 字符串
-        msg.value_len = strlen(json_str);        // 字符串长度
-        
+        msg.value_len = json_len;     // 字符串长度
+
         sle_server_send_report_by_handle(msg);   // 通过 SLE 发送
-        // 释放内存
-        cJSON_Delete(root);
-        free(json_str);
         
         osal_mdelay(1000);
     }

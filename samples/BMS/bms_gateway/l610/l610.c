@@ -21,7 +21,7 @@
 #define UART_RX_MAX 512
 uint8_t uart_rx_buffer[UART_RX_MAX];
 /* 串口接收io*/
-#define CONFIG_UART_TXD_PIN 8
+#define CONFIG_UART_TXD_PIN 8 
 #define CONFIG_UART_RXD_PIN 7
 #define CONFIG_UART_PIN_MODE 2
 
@@ -49,19 +49,6 @@ uint32_t uart_send_buff(uint8_t *str, uint16_t len)
         printf("send lenth:%d\n", ret);
     }
     return ret;
-}
-// 读取队列中接收到的回复 并打印
-void recv_uart_hex(void)
-{
-    printf("recv:");
-    for (uint16_t k = 0; k < uart2_recv.recv_len; k++) {
-        /* code */
-        printf("%X ", uart2_recv.recv[k]);
-    }
-    printf("\r\n");
-    // 解析数据包
-    voice_control_data(uart2_recv.recv);
-    uart2_recv.recv_flag = 0;
 }
 
 /* 串口接收回调 */
@@ -154,10 +141,22 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 	}
 }
 
+/*
+函数名称: L610_Detach
+说明: L610模组离网（断开网络连接）
+参数: uint8_t isPrintf: 是否打印Log
+*/
+void L610_Detach(uint8_t isPrintf) {
+    // // 关闭TCP/UDP Socket
+    // L610_SendCmd("AT+MIPCLOSE=1\r\n", "OK", DefaultTimeout, isPrintf);
+    // // 关闭MQTT连接
+    // L610_SendCmd("AT+MQTTCLOSE=1\r\n", "OK", DefaultTimeout, isPrintf);
+    //关闭华为云连接（如有）
+    L610_SendCmd("AT+HMDIS\r\n", "OK", DefaultTimeout, isPrintf);
 
-
-
-
+    L610_SendCmd((uint8_t *) "AT+MIPCALL=0\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
+    if (isPrintf) printf("Detach!\r\n");
+}
 
 /********************MQTT协议****************************/
 

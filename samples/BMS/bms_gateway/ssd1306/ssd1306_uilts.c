@@ -101,20 +101,17 @@ void get_environment_task(environment_msg *msg)
 {
     // temp_hum_chinese();
     ssd1306_set_cursor(32, 8); /* x坐标为32，y轴坐标为8 */
-    msg->temperature++;
-    if(msg->temperature > 100) {
-        msg->temperature = 0;
-    }
-    msg->humidity++;
-    if(msg->humidity > 100) {
-        msg->humidity = 0;
+    for(int i=0; i<5; i++) {
+        msg->temperature[i]++;
+        if(msg->temperature[i] > 100) {
+            msg->temperature[i] = 0;
+        }
     }
     msg->current++;
     if(msg->current > 100) {
         msg->current = 0;
     }
-    sprintf(g_templine, "%.2f", msg->temperature);
-    sprintf(g_humiline, "%.2f", msg->humidity);
+    sprintf(g_templine, "%.2f", msg->temperature[0]);
     sprintf(g_currentline, "%.2f", msg->current);
     ssd1306_draw_string(g_templine, g_font_7x10, WHITE);
     ssd1306_set_cursor(32, 40); /* x坐标为32，y轴坐标为40 */

@@ -1,14 +1,15 @@
 # 设置源文件列表
-# 包含WiFi连接、MQTT示例、蜂鸣器PWM、cJSON解析、
-# 环境传感器(AHT20)和OLED显示(SSD1306)相关源文件
+# 包含WiFi连接、MQTT、cJSON解析、
+# OLED显示(SSD1306)相关源文件
 set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/wifi/wifi_connect.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mqtt_demo.c
     ${CMAKE_CURRENT_SOURCE_DIR}/cjson/cjson_demo.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/environment/ssd1306_uilts.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/environment/ssd1306_fonts.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/environment/ssd1306.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/l610.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306/ssd1306_uilts.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306/ssd1306_fonts.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306/ssd1306.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/l610/l610.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_client/sle_client.c
 )
 
 # 设置头文件目录列表
@@ -16,7 +17,9 @@ set(SOURCES_LIST
 set(HEADER_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/wifi 
     ${CMAKE_CURRENT_SOURCE_DIR}/cjson
-    ${CMAKE_CURRENT_SOURCE_DIR}/environment
+    ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306
+    ${CMAKE_CURRENT_SOURCE_DIR}/l610
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_client
 )
 
 # 将本目录的源文件添加到父作用域的SOURCES变量

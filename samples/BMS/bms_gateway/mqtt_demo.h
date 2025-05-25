@@ -8,10 +8,8 @@ typedef enum {
 
 typedef struct {
     int msg_type;
-    char temperature[10];
-    // char humidity[10];
-    char current[10];
-    char *receive_payload;
+    char receive_payload[256];
+    char temperature[64];
+    char current[16];
 } MQTT_msg;
-
 #endif
