@@ -33,10 +33,6 @@
 #define ADDRESS "tcp://2502007d6f.st1.iotda-device.cn-north-4.myhuaweicloud.com"
 // 客户端ID，用于唯一标识设备
 #define CLIENTID "680b91649314d11851158e8d_Battery01_0_0_2025042603"
-// MQTT主题名称
-#define TOPIC "MQTT Examples"
-// 测试消息内容
-#define PAYLOAD "Hello World!"
 // 服务质量等级：1表示至少发送一次
 #define QOS 1
 
@@ -46,10 +42,8 @@
 
 // 任务相关配置
 #define MQTT_STA_TASK_PRIO 24           // MQTT任务优先级
-#define MQTT_STA_TASK_STACK_SIZE 0x1000 // MQTT任务栈大小
+#define MQTT_STA_TASK_STACK_SIZE 0x2000 // MQTT任务栈大小
 #define TIMEOUT 10000L                  // 超时时间：10秒
-#define MSG_MAX_LEN 28                  // 消息最大长度
-#define MSG_QUEUE_SIZE 32               // 消息队列大小
 
 // ======================== 全局变量定义 ========================
 
@@ -179,34 +173,6 @@ int mqtt_subscribe(const char *topic)
 }
 
 /**
- * @brief 发布MQTT消息
- * @param topic 发布的主题
- * @param report_msg 要发送的消息内容，包含温度和湿度数据
- * @return MQTTCLIENT_SUCCESS表示成功，其他值表示失败
- * @note 函数会动态分配内存用于JSON消息，使用完后会释放
- */
-int mqtt_publish(const char *topic, MQTT_msg *report_msg)
-{
-    MQTTClient_message pubmsg = MQTTClient_message_initializer;
-    MQTTClient_deliveryToken token;
-    int rc = 0;
-    char json[256];
-    snprintf(json, sizeof(json),
-        "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"temperature\":%s,\"current\":%s,\"Switch\":false}}]}",
-        report_msg->temperature, report_msg->current);
-    pubmsg.payload = json;
-    pubmsg.payloadlen = (int)strlen(json);
-    pubmsg.qos = QOS;
-    pubmsg.retained = 0;
-    rc = MQTTClient_publishMessage(client, topic, &pubmsg, &token);
-    if (rc != MQTTCLIENT_SUCCESS) {
-        printf("mqtt_publish failed\r\n");
-    }
-    printf("mqtt_publish(), the payload is %s, the topic is %s\r\n", json, topic);
-    return rc;
-}
-
-/**
  * @brief 连接MQTT服务器
  * @return MQTTCLIENT_SUCCESS表示成功，-1表示失败
  * @note 该函数会初始化MQTT客户端，设置连接参数并建立连接
@@ -218,7 +184,6 @@ int mqtt_connect(void)
     int rc;
     int retry = 0;
     printf("start mqtt sync subscribe...\r\n");
-    // MQTTClient_init(); // 移除多余的全局初始化，防止多次初始化互斥锁
     do {
         rc = MQTTClient_create(&client, ADDRESS, CLIENTID, MQTTCLIENT_PERSISTENCE_NONE, NULL);
         if (rc == MQTTCLIENT_SUCCESS) break;
@@ -332,28 +297,36 @@ int mqtt_task(void)
     app_uart_init_config();// 初始化4G串口
     int ret = 0;
     char *beep_status = NULL;
+    int loop_counter = 0; // 循环计数器，用于控制WiFi检查间隔
     // 连接WiFi
-    wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD);
-    // 连接MQTT服务器
-    ret = mqtt_connect();
-    if (ret != 0) {
-        printf("connect failed, result %d\n", ret);
+    if (wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD) != 0) {
+
+        printf("wifi connect failed\n");
+
+    }else{
+        // 连接MQTT服务器
+        ret = mqtt_connect();
+        if (ret != 0) {
+            printf("connect failed, result %d\n", ret);
+        }
+        osal_msleep(1000); // 等待连接成功
+        // 组合命令主题字符串
+        char *cmd_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/commands/#");
+        if (cmd_topic) {
+            ret = mqtt_subscribe(cmd_topic);
+            free(cmd_topic);
+        } else {
+            printf("combine_strings failed for cmd_topic\n");
+        }
     }
-    osal_msleep(1000); // 等待连接成功
-    // 组合命令主题字符串
-    char *cmd_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/commands/#");
-    if (cmd_topic) {
-        ret = mqtt_subscribe(cmd_topic);
-        free(cmd_topic);
-    } else {
-        printf("combine_strings failed for cmd_topic\n");
-    }
+    
     // 组合上报主题字符串
     char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
     if (!report_topic) {
         printf("combine_strings failed for report_topic\n");
         return -1;
     }
+
     int report_count = 0;
     while (1) {
         // 处理下发命令

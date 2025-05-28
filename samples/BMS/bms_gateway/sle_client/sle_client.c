@@ -317,10 +317,6 @@ void sle_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_valu
     //     printf("Invalid or missing current field\r\n");
     // }
     
-    // 确保所有数据都安全地访问
-    printf("Parsed data: total_voltage=%u, current=%u\r\n", 
-           g_env_msg.total_voltage, g_env_msg.current);
-    
     
     // 清理资源
     cJSON_Delete(json);

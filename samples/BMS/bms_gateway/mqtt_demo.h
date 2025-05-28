@@ -4,7 +4,8 @@
 // 网络类型枚举定义
 typedef enum {
     NET_TYPE_4G,
-    NET_TYPE_WIFI
+    NET_TYPE_WIFI,
+    NET_TYPE_NONE
 } net_type_t;
 
 typedef struct {

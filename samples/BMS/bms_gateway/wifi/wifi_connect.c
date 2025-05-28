@@ -225,7 +225,8 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
     g_wifi_state = WIFI_STA_SAMPLE_INIT;
     struct netif *netif_p = TD_NULL;
     td_u32 wait_count = 0;
-    // int max_retry = 1000; // 死循环加最大重试保护
+    int retry_count = 0;  // 添加重试计数
+    int max_retry = 2;    // 最大尝试2次
 
     /* 创建STA接口 */
     if (wifi_sta_enable() != 0) {
@@ -233,7 +234,7 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
     }
     PRINT("%s::STA enable succ.\r\n", WIFI_STA_SAMPLE_LOG);
 
-    while (1) {
+    while (retry_count < max_retry) {  // 修改循环条件
         (void)osDelay(1);
         if (g_wifi_state == WIFI_STA_SAMPLE_INIT) 
         {
@@ -253,6 +254,7 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
             {
                 PRINT("%s::Do not find AP, try again !\r\n", WIFI_STA_SAMPLE_LOG);
                 g_wifi_state = WIFI_STA_SAMPLE_INIT;
+                retry_count++;
                 continue;
             }
             g_wifi_state = WIFI_STA_SAMPLE_FOUND_TARGET;
@@ -285,10 +287,9 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
                 netifapi_netif_common(netif_p, dhcp_clients_info_show, NULL);
                 return 0;
             }
-            wait_count++;
         }
     }
-    PRINT("%s::WiFi connect timeout or failed!\r\n", WIFI_STA_SAMPLE_LOG);
+    PRINT("%s::WiFi connect timeout or failed after %d attempts!\r\n", WIFI_STA_SAMPLE_LOG, max_retry);
     return -1;
 }
 
