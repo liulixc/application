@@ -24,6 +24,9 @@
 #include "sle_connection_manager.h"
 #include "sle_client.h"
 #include "app_init.h"
+#include "cJSON.h"
+#include "mqtt_demo.h"
+
 #define SLE_MTU_SIZE_DEFAULT 512
 #define SLE_SEEK_INTERVAL_DEFAULT 100
 #define SLE_SEEK_WINDOW_DEFAULT 100
@@ -45,6 +48,8 @@ static ssapc_callbacks_t g_sle_uart_ssapc_cbk = {0};
 static sle_addr_t g_sle_remote_addr = {0};
 ssapc_write_param_t g_sle_send_param = {0};
 uint16_t g_sle_uart_conn_id = 0;
+
+extern volatile environment_msg g_env_msg; // 全局环境消息变量
 
 // 发送数据包
 static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
@@ -234,12 +239,92 @@ void sle_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_valu
     unused(client_id);
     unused(conn_id);
     unused(status);
-    printf("recv len:%d data: ", data->data_len);
-    for (uint16_t i = 0; i < data->data_len; i++) {
-        printf("%c", data->data[i]);
+    
+    if (data == NULL || data->data == NULL || data->data_len == 0) {
+        return;
     }
-    printf("\r\n");
-    uart_send_buff(data->data, data->data_len); // 发送数据到串口
+    // 简单打印接收的数据长度，不打印完整内容以避免日志缓冲区问题
+    printf("Received notification data, length: %d\r\n", data->data_len);
+    char *json_str = NULL;
+    json_str = (char *)osal_vmalloc(data->data_len + 1);
+    if (json_str == NULL) {
+        printf("Failed to allocate memory for JSON string\r\n");
+        return;
+    }
+    // 复制数据到临时缓冲区并添加字符串结束符
+    if (memcpy_s(json_str, data->data_len + 1, data->data, data->data_len) != EOK) {
+        osal_vfree(json_str);
+        printf("Failed to copy JSON data\r\n");
+        return;
+    }
+    json_str[data->data_len] = '\0';
+    
+    // 使用cJSON解析JSON数据
+    cJSON *json = NULL;
+    json = cJSON_Parse(json_str);
+    if (json == NULL) {
+        printf("JSON parse failed\r\n");
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 解析total_voltage
+    cJSON *total_voltage = cJSON_GetObjectItem(json, "total_voltage");
+    if (cJSON_IsNumber(total_voltage)) {
+        g_env_msg.total_voltage = total_voltage->valueint;
+        g_env_msg.current = total_voltage->valueint;
+    } else {
+        printf("Invalid or missing total_voltage field\r\n");
+    }
+
+
+    
+    // 解析cell_voltages数组
+    cJSON *cell_voltages = cJSON_GetObjectItem(json, "cell_voltages");
+    if (cJSON_IsArray(cell_voltages)) {
+        int size = cJSON_GetArraySize(cell_voltages);
+        int max_cells = sizeof(g_env_msg.cell_voltages)/sizeof(g_env_msg.cell_voltages[0]);
+        for (int i = 0; i < size && i < max_cells; i++) {
+            cJSON *item = cJSON_GetArrayItem(cell_voltages, i);
+            if (cJSON_IsNumber(item)) {
+                g_env_msg.cell_voltages[i] = item->valueint;
+            }
+        }
+    } else {
+        printf("Invalid or missing cell_voltages array\r\n");
+    }
+    
+    // 解析temperature数组
+    cJSON *temperature = cJSON_GetObjectItem(json, "temperature");
+    if (cJSON_IsArray(temperature)) {
+        int size = cJSON_GetArraySize(temperature);
+        int max_temps = sizeof(g_env_msg.temperature)/sizeof(g_env_msg.temperature[0]);
+        for (int i = 0; i < size && i < max_temps; i++) {
+            cJSON *item = cJSON_GetArrayItem(temperature, i);
+            if (cJSON_IsNumber(item)) {
+                g_env_msg.temperature[i] = item->valueint;
+            }
+        }
+    } else {
+        printf("Invalid or missing temperature array\r\n");
+    }
+    
+    // // 解析current
+    // cJSON *current = cJSON_GetObjectItem(json, "current");
+    // if (cJSON_IsNumber(current)) {
+    //     g_env_msg.current = current->valueint;  // 正确使用current变量
+    // } else {
+    //     printf("Invalid or missing current field\r\n");
+    // }
+    
+    // 确保所有数据都安全地访问
+    printf("Parsed data: total_voltage=%u, current=%u\r\n", 
+           g_env_msg.total_voltage, g_env_msg.current);
+    
+    
+    // 清理资源
+    cJSON_Delete(json);
+    osal_vfree(json_str);
 }
 /* 收到指示回调 */
 void sle_indication_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data, errcode_t status)
