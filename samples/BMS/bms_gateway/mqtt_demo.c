@@ -23,10 +23,7 @@
 #include "common_def.h"
 #include "wifi_connect.h"
 #include "watchdog.h"
-#include "ssd1306.h"
-#include "ssd1306_fonts.h"
 #include "cjson_demo.h"
-#include "ssd1306_uilts.h"
 #include "mqtt_demo.h"
 #include "l610.h"
 
@@ -99,7 +96,6 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
     unused(topic_len);
     // 直接写入全局命令变量
     memset((void*)&g_cmd_msg, 0, sizeof(MQTT_msg));
-    g_cmd_msg.msg_type = EN_MSG_PARS;
     // 安全拷贝payload内容，防止悬挂指针
     if (message && message->payload && message->payloadlen > 0) {
         size_t copy_len = sizeof(g_cmd_msg.receive_payload) - 1;
@@ -127,6 +123,43 @@ void connlost(void *context, char *cause)
 }
 
 // ======================== MQTT操作函数 ========================
+
+/**
+ * @brief 直接发布环境数据到MQTT
+ * @param topic 发布的主题
+ * @return MQTTCLIENT_SUCCESS表示成功，其他值表示失败
+ * @note 直接使用全局环境数据g_env_msg，无需中间结构体
+ */
+int mqtt_publish_env(const char *topic)
+{
+    MQTTClient_message pubmsg = MQTTClient_message_initializer;
+    MQTTClient_deliveryToken token;
+    int rc = 0;
+    char json[512]; // 增加缓冲区大小以容纳更多数据
+      // 直接使用g_env_msg数据构建JSON
+    snprintf(json, sizeof(json),
+        "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"temperature\":[%.2f,%.2f,%.2f,%.2f,%.2f],\"current\":%.2f,\"total_voltage\":%.2f,\"cell_voltages\":[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f],\"Switch\":false}}]}",
+        g_env_msg.temperature[0], g_env_msg.temperature[1],
+        g_env_msg.temperature[2], g_env_msg.temperature[3],
+        g_env_msg.temperature[4], g_env_msg.current,
+        g_env_msg.total_voltage,
+        g_env_msg.cell_voltages[0], g_env_msg.cell_voltages[1], g_env_msg.cell_voltages[2],
+        g_env_msg.cell_voltages[3], g_env_msg.cell_voltages[4], g_env_msg.cell_voltages[5],
+        g_env_msg.cell_voltages[6], g_env_msg.cell_voltages[7], g_env_msg.cell_voltages[8],
+        g_env_msg.cell_voltages[9], g_env_msg.cell_voltages[10], g_env_msg.cell_voltages[11]);
+    
+    pubmsg.payload = json;
+    pubmsg.payloadlen = (int)strlen(json);
+    pubmsg.qos = QOS;
+    pubmsg.retained = 0;
+    
+    rc = MQTTClient_publishMessage(client, topic, &pubmsg, &token);
+    if (rc != MQTTCLIENT_SUCCESS) {
+        printf("mqtt_publish_env failed\r\n");
+    }
+    printf("mqtt_publish_env(), the payload is %s, the topic is %s\r\n", json, topic);
+    return rc;
+}
 
 /**
  * @brief 订阅MQTT主题
@@ -221,11 +254,6 @@ int mqtt_connect(void)
 }
 
 // ======================== 网络切换流程 ========================
-// 网络类型枚举
-typedef enum {
-    NET_TYPE_4G,
-    NET_TYPE_WIFI
-} net_type_t;
 
 static net_type_t current_net = NET_TYPE_WIFI;
 
@@ -330,40 +358,42 @@ int mqtt_task(void)
     while (1) {
         // 处理下发命令
         if (g_cmd_msg_flag) {
-            if (g_cmd_msg.msg_type == EN_MSG_PARS) {
-                if (g_cmd_msg.receive_payload[0] != '\0') {
-                    beep_status = parse_json(g_cmd_msg.receive_payload);
-                } else {
-                    printf("Warning: receive_payload is empty, skip parse_json\n");
-                }
-                g_cmd_msg_flag = 0;
+            if (g_cmd_msg.receive_payload[0] != '\0') {
+                beep_status = parse_json(g_cmd_msg.receive_payload);
+            } else {
+                printf("Warning: receive_payload is empty, skip parse_json\n");
             }
+            g_cmd_msg_flag = 0;
+        
         }
         if (current_net == NET_TYPE_WIFI && report_topic) {
-            // 上报环境数据
-            MQTT_msg report_msg;
-            memset(&report_msg, 0, sizeof(MQTT_msg));
-            snprintf(report_msg.temperature, sizeof(report_msg.temperature),
-                "[%.2f,%.2f,%.2f,%.2f,%.2f]",
-                g_env_msg.temperature[0], g_env_msg.temperature[1],
-                g_env_msg.temperature[2], g_env_msg.temperature[3],
-                g_env_msg.temperature[4]);
-            snprintf(report_msg.current, sizeof(report_msg.current), "%.2f", g_env_msg.current);
-            report_msg.msg_type = EN_MSG_REPORT;
-            mqtt_publish(report_topic, &report_msg);
+            // WiFi网络使用MQTT Client上报
+            if (mqtt_publish_env(report_topic) != MQTTCLIENT_SUCCESS) {
+                printf("WiFi MQTT publish failed\r\n");
+            } else {
+                printf("WiFi MQTT publish success\r\n");
+            }        
         } else if (current_net == NET_TYPE_4G) {
-            // 4G上云，直接调用4G上报函数
-            char payload[256];
+            // 4G网络使用L610模块上报
+            char payload[512]; // 增加缓冲区大小以容纳更多数据            
+            
             snprintf(payload, sizeof(payload),
-                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"temperature\":[%.2f,%.2f,%.2f,%.2f,%.2f],\"current\":%.2f,\"Switch\":false}}]}",
-                g_env_msg.temperature[0], g_env_msg.temperature[1], g_env_msg.temperature[2], g_env_msg.temperature[3], g_env_msg.temperature[4], g_env_msg.current);
+                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"temperature\":[%.2f,%.2f,%.2f,%.2f,%.2f],\"current\":%.2f,\"total_voltage\":%.2f,\"cell_voltages\":[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f],\"Switch\":false}}]}",
+                g_env_msg.temperature[0], g_env_msg.temperature[1], g_env_msg.temperature[2], g_env_msg.temperature[3], g_env_msg.temperature[4],
+                g_env_msg.current, g_env_msg.total_voltage,
+                g_env_msg.cell_voltages[0], g_env_msg.cell_voltages[1], g_env_msg.cell_voltages[2],
+                g_env_msg.cell_voltages[3], g_env_msg.cell_voltages[4], g_env_msg.cell_voltages[5],
+                g_env_msg.cell_voltages[6], g_env_msg.cell_voltages[7], g_env_msg.cell_voltages[8],
+                g_env_msg.cell_voltages[9], g_env_msg.cell_voltages[10], g_env_msg.cell_voltages[11]);
             L610_HuaweiCloudReport(
                 "$oc/devices/680b91649314d11851158e8d_Battery01/sys/properties/report",
                 payload);
-            printf("[HUAWEI CLOUD] report: %s\r\n", payload);
+            printf("[HUAWEI CLOUD] 4G report: %s\r\n", payload);
         } else {
-            printf("Warning: report_topic is NULL, skip mqtt_publish\n");
+            printf("Warning: report_topic is NULL or network type unknown, skip publish\n");
         }
+
+
         osal_msleep(1000);
         report_count++;
         if (report_count == 10) {
@@ -378,32 +408,7 @@ int mqtt_task(void)
     return ret;
 }
 
-/**
- * @brief 环境数据采集任务
- * @note 该任务负责：
- *       1. 初始化传感器
- *       2. 周期性读取温湿度数据
- *       3. 将数据写入消息队列
- */
-void environment_task_entry(void)
-{
-    environment_msg env_msg;
-    // 传感器初始化（如有需要可取消注释）
-    // ssd1306_up_init();
-    while (1) {
-        //  get_environment_task(&env_msg);
-        
-        // for (int i = 0; i < 5; i++) {
-        //     g_env_msg.temperature[i] = env_msg.temperature[i];
-        // }
-        // g_env_msg.current = env_msg.current;
-        for (int i = 0; i < 5; i++) {
-            g_env_msg.temperature[i]+=0.01;
-        }
-        g_env_msg.current+=0.01;
-        osal_msleep(1000); // 1000ms读取数据
-    }
-}
+
 
 // ======================== MQTT示例程序入口函数 ========================
 /**
@@ -419,7 +424,6 @@ static void mqtt_sample_entry(void)
     // 禁用看门狗，防止开发阶段重启
     uapi_watchdog_disable();
     osal_task *task_handle = NULL;
-    osal_task *env_task_handle = NULL;
     // 初始化全局结构体，防止野指针
     memset((void*)&g_env_msg, 0, sizeof(g_env_msg));
     memset((void*)&g_cmd_msg, 0, sizeof(g_cmd_msg));
@@ -431,13 +435,6 @@ static void mqtt_sample_entry(void)
     if (task_handle != NULL) {
         osal_kthread_set_priority(task_handle, MQTT_STA_TASK_PRIO);
         osal_kfree(task_handle);
-    }
-    // 创建环境数据采集任务
-    env_task_handle =
-        osal_kthread_create((osal_kthread_handler)environment_task_entry, 0, "EnvDemoTask", MQTT_STA_TASK_STACK_SIZE);
-    if (env_task_handle != NULL) {
-        osal_kthread_set_priority(env_task_handle, MQTT_STA_TASK_PRIO);
-        osal_kfree(env_task_handle);
     }
     // 解锁
     osal_kthread_unlock();
