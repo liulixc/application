@@ -37,7 +37,7 @@ uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
 #define CMD_LEN 512
 char cmdSend[CMD_LEN];		//发送上报数据的AT指令
-uint32_t DefaultTimeout=500;//超时
+uint32_t DefaultTimeout=1000;//超时
 
 
 // 发送数据包

@@ -223,7 +223,7 @@ int mqtt_connect(void)
 static net_type_t current_net = NET_TYPE_WIFI;
 
 // 切换到WiFi
-void switch_to_wifi(const char *ssid, const char *psk)
+int switch_to_wifi(const char *ssid, const char *psk)
 {
     // 切换前彻底释放旧的MQTT client，防止资源泄漏
     if (client != NULL) {
@@ -234,13 +234,11 @@ void switch_to_wifi(const char *ssid, const char *psk)
         client = NULL;
         osal_msleep(500); // 等待资源彻底释放
     }
-    if (current_net == NET_TYPE_4G) {
-        printf("[网络切换] 断开4G，准备连接WiFi...\n");
-        L610_Detach(1);         // 断开4G
-    }
+
+    wifi_disconnect(); // 确保断开WiFi连接
+
     printf("[网络切换] 连接WiFi: SSID=%s\n", ssid);
-    if (example_sta_function(ssid, psk) == 0) {
-        osal_msleep(1500); // 等待网络栈稳定
+    if (wifi_connect(ssid, psk) == 0) {
         // WiFi连接成功后，建立MQTT连接
         if (mqtt_connect() == 0) {
             // 重新订阅命令topic
@@ -253,11 +251,16 @@ void switch_to_wifi(const char *ssid, const char *psk)
         } else {
             printf("[网络切换] MQTT连接失败\n");
         }
+        if (current_net == NET_TYPE_4G) {
+        printf("[网络切换] 断开4G，准备连接WiFi...\n");
+        L610_Detach(1);         // 断开4G
+        }
+        current_net = NET_TYPE_WIFI;
+        return 1;
     } else {
         printf("[网络切换] WiFi连接失败\n");
+        return 0;
     }
-    current_net = NET_TYPE_WIFI;
-    printf("[网络切换] 已切换到WiFi\n");
 }
 
 // 切换到4G
@@ -298,11 +301,13 @@ int mqtt_task(void)
     int ret = 0;
     char *beep_status = NULL;
     int loop_counter = 0; // 循环计数器，用于控制WiFi检查间隔
+    int wifi_retry_counter = 0; // WiFi重试计数器
+    
     // 连接WiFi
     if (wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD) != 0) {
-
         printf("wifi connect failed\n");
-
+        // WiFi连接失败，切换到4G
+        switch_to_4g();
     }else{
         // 连接MQTT服务器
         ret = mqtt_connect();
@@ -327,7 +332,6 @@ int mqtt_task(void)
         return -1;
     }
 
-    int report_count = 0;
     while (1) {
         // 处理下发命令
         if (g_cmd_msg_flag) {
@@ -337,12 +341,32 @@ int mqtt_task(void)
                 printf("Warning: receive_payload is empty, skip parse_json\n");
             }
             g_cmd_msg_flag = 0;
-        
         }
+        
+        // 智能网络管理逻辑
+        if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
+            if (current_net == NET_TYPE_4G) {
+                // 当前是4G模式，检查WiFi是否可用
+                if (switch_to_wifi(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD) == 1) {
+                    printf("[网络管理] 成功连接并切换到WiFi模式\n");
+                } else {
+                    printf("[网络管理] 连接WiFi失败，继续使用4G\n");
+                }
+            }
+        }
+        
+        // 根据当前网络类型选择上报方式
         if (current_net == NET_TYPE_WIFI && report_topic) {
+            if (!check_wifi_status()) {
+                    printf("[网络管理] WiFi发布失败且WiFi已断开，切换到4G模式\n");
+                    switch_to_4g();
+                    continue; // 跳过本次循环，等待4G连接
+                }
             // WiFi网络使用MQTT Client上报
             if (mqtt_publish_env(report_topic) != MQTTCLIENT_SUCCESS) {
                 printf("WiFi MQTT publish failed\r\n");
+                // 发布失败，可能是WiFi连接问题，检查WiFi状态
+                
             } else {
                 printf("WiFi MQTT publish success\r\n");
             }        
@@ -366,22 +390,12 @@ int mqtt_task(void)
             printf("Warning: report_topic is NULL or network type unknown, skip publish\n");
         }
 
-
         osal_msleep(1000);
-        report_count++;
-        if (report_count == 10) {
-            if (current_net == NET_TYPE_WIFI) {
-                switch_to_4g();
-            } else {
-                switch_to_wifi(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD);
-            }
-            report_count = 0;
-        }
+        loop_counter++;
     }
+    
     return ret;
 }
-
-
 
 // ======================== MQTT示例程序入口函数 ========================
 /**
@@ -402,6 +416,7 @@ static void mqtt_sample_entry(void)
     memset((void*)&g_cmd_msg, 0, sizeof(g_cmd_msg));
     MQTTClient_init(); // 只在入口初始化一次
     // 加锁，防止多线程冲突
+    
     osal_kthread_lock();
     // 创建MQTT主任务
     task_handle = osal_kthread_create((osal_kthread_handler)mqtt_task, 0, "MqttDemoTask", MQTT_STA_TASK_STACK_SIZE);

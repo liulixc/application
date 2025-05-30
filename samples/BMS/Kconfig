@@ -6,6 +6,12 @@ config SAMPLE_SUPPORT_BMS_SLAVE
     help
         This option means support BMS_SLAVE Sample.
 
+if SAMPLE_SUPPORT_BMS_SLAVE
+menu "BMS Slave Sample Configuration"
+    osource "application/samples/BMS/bms_slave/Kconfig"
+endmenu
+endif       
+
 config SAMPLE_SUPPORT_BMS_GATEWAY
     bool
     prompt "Support BMS_GATEWAY Sample."
@@ -14,8 +20,3 @@ config SAMPLE_SUPPORT_BMS_GATEWAY
     help
         This option means support BMS_GATEWAY Sample.
 
-if SAMPLE_SUPPORT_BMS_SLAVE
-menu "BMS Slave Sample Configuration"
-    osource "application/samples/BMS/bms_slave/Kconfig"
-endmenu
-endif

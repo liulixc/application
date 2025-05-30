@@ -287,6 +287,7 @@ td_s32 example_sta_function(const char *ssid, const char *psk)
                 netifapi_netif_common(netif_p, dhcp_clients_info_show, NULL);
                 return 0;
             }
+            wait_count++;
         }
     }
     PRINT("%s::WiFi connect timeout or failed after %d attempts!\r\n", WIFI_STA_SAMPLE_LOG, max_retry);
@@ -339,3 +340,30 @@ int wifi_disconnect(void)
     return 0;
 }
 
+/**
+ * @brief 检查WiFi连接状态
+ * @return 1表示WiFi连接正常，0表示WiFi断开
+ * @note 检查连接状态和IP地址有效性
+ */
+int check_wifi_status(void)
+{
+    td_char ifname[WIFI_IFNAME_MAX_SIZE + 1] = "wlan0";
+    wifi_linked_info_stru wifi_status;
+    memset_s(&wifi_status, sizeof(wifi_linked_info_stru), 0, sizeof(wifi_linked_info_stru));
+    
+    // 获取WiFi连接状态
+    if (wifi_sta_get_ap_info(&wifi_status) != 0) {
+        return 0; // 获取状态失败，认为WiFi断开
+    }
+    
+    // 检查连接状态和IP地址
+    if (wifi_status.conn_state == 1) {
+        // 检查IP地址是否有效
+        struct netif *netif_p = netifapi_netif_find(ifname);
+        if (netif_p != NULL && ip_addr_isany(&(netif_p->ip_addr)) == 0) {
+            return 1; // WiFi已连接且有IP地址
+        }
+    }
+    
+    return 0; // WiFi未连接或无IP地址
+}
