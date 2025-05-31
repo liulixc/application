@@ -26,10 +26,10 @@ typedef struct {
     uint16_t value_len;
 } msg_data_t;
 /* 串口接收io */
-#define CONFIG_UART_TXD_PIN 17
-#define CONFIG_UART_RXD_PIN 18
+#define CONFIG_UART_TXD_PIN 15
+#define CONFIG_UART_RXD_PIN 16
 #define CONFIG_UART_PIN_MODE 1
-#define CONFIG_UART_ID UART_BUS_0
+#define CONFIG_UART_ID UART_BUS_1
 void sle_client_init(void);
 
 void sle_uart_start_scan(void);

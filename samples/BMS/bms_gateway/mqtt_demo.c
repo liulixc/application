@@ -26,6 +26,7 @@
 #include "cjson_demo.h"
 #include "mqtt_demo.h"
 #include "l610.h"
+#include "sle_client.h"
 
 // ======================== 配置参数 ========================
 
@@ -36,9 +37,12 @@
 // 服务质量等级：1表示至少发送一次
 #define QOS 1
 
-// WiFi配置信息
-#define CONFIG_WIFI_SSID "QQ"       // WiFi名称
-#define CONFIG_WIFI_PWD "tangyuan"  // WiFi密码
+// // WiFi配置信息
+extern char g_wifi_ssid[MAX_WIFI_SSID_LEN]; // 默认SSID
+extern char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN]; // 默认密码
+
+// char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
+// char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
 
 // 任务相关配置
 #define MQTT_STA_TASK_PRIO 24           // MQTT任务优先级
@@ -237,7 +241,7 @@ int switch_to_wifi(const char *ssid, const char *psk)
 
     wifi_disconnect(); // 确保断开WiFi连接
 
-    printf("[网络切换] 连接WiFi: SSID=%s\n", ssid);
+    printf("[网络切换] 连接WiFi: SSID=%s\\n", ssid);
     if (wifi_connect(ssid, psk) == 0) {
         // WiFi连接成功后，建立MQTT连接
         if (mqtt_connect() == 0) {
@@ -304,8 +308,8 @@ int mqtt_task(void)
     int wifi_retry_counter = 0; // WiFi重试计数器
     
     // 连接WiFi
-    if (wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD) != 0) {
-        printf("wifi connect failed\n");
+    if (wifi_connect(g_wifi_ssid, g_wifi_pwd) != 0) {
+        printf("wifi connect failed\\n");
         // WiFi连接失败，切换到4G
         switch_to_4g();
     }else{
@@ -347,10 +351,10 @@ int mqtt_task(void)
         if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
             if (current_net == NET_TYPE_4G) {
                 // 当前是4G模式，检查WiFi是否可用
-                if (switch_to_wifi(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD) == 1) {
-                    printf("[网络管理] 成功连接并切换到WiFi模式\n");
+                if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
+                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
                 } else {
-                    printf("[网络管理] 连接WiFi失败，继续使用4G\n");
+                    printf("[网络管理] 连接WiFi失败，继续使用4G\\n");
                 }
             }
         }
