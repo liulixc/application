@@ -27,5 +27,4 @@ char *make_json(char *service_id, char *temperature, char *humidity);
 char *parse_json(char *json_string);
 char *combine_strings(int str_amount, char *str1, ...);
 
-char *build_and_print_bms_json(uint16_t cell_codes[1][12], uint16_t gpiocode[1][6], int MOD_VOL, int *out_len);
 #endif

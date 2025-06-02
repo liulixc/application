@@ -36,7 +36,9 @@ if(DEFINED CONFIG_ENABLE_BMS_SAMPLE)
     add_subdirectory_if_exist(BMS) # 添加电池管理样例
 endif()
 
-add_subdirectory_if_exist(custom) # 总是添加自定义样例目录
+if(DEFINED CONFIG_ENABLE_SLE_GATE_SAMPLE)
+    add_subdirectory_if_exist(sle_gate) # 添加SLE网关样例
+endif()
 
 set(PRIVATE_HEADER
 ) # 私有头文件列表
@@ -77,5 +79,6 @@ install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/bt/ble" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/bt/sle" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/Farsight" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/BMS" "*")
+install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/sle_gate" "*")
 
 build_component() # 构建该组件

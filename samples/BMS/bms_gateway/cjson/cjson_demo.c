@@ -102,25 +102,3 @@ char *parse_json(char *json_string)
     cJSON_Delete(root);
     return string;
 }
-
-char *build_and_print_bms_json(uint16_t cell_codes[1][12], uint16_t gpiocode[1][6], int MOD_VOL, int *out_len)
-{
-    cJSON *cell_voltages = cJSON_CreateArray();
-    for (int i = 0; i < 12; i++) {
-        cJSON_AddItemToArray(cell_voltages, cJSON_CreateNumber(cell_codes[0][i]));
-    }
-    cJSON *temperatures = cJSON_CreateArray();
-    for (int i = 0; i < 5; i++) {
-        cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(gpiocode[0][i]));
-    }
-    cJSON *root = cJSON_CreateObject();
-    cJSON_AddNumberToObject(root, "total_voltage", MOD_VOL);
-    cJSON_AddNumberToObject(root, "BMS_ID", 1);
-    cJSON_AddItemToObject(root, "cell_voltages", cell_voltages);
-    cJSON_AddItemToObject(root, "temperatures", temperatures);
-    char *json_str = cJSON_Print(root);
-    printf("BMS_JSON:%s\n", json_str);
-    if (out_len) *out_len = strlen(json_str);
-    cJSON_Delete(root);
-    return json_str;
-}

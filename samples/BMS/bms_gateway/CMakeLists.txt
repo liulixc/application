@@ -6,6 +6,7 @@ set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/cjson/cjson_demo.c
     ${CMAKE_CURRENT_SOURCE_DIR}/l610/l610.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_client/sle_client.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/monitor/monitor.c
 )
 
 # 设置头文件目录列表
@@ -16,6 +17,7 @@ set(HEADER_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/cjson
     ${CMAKE_CURRENT_SOURCE_DIR}/l610
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_client
+    ${CMAKE_CURRENT_SOURCE_DIR}/monitor
 )
 
 # 将本目录的源文件添加到父作用域的SOURCES变量

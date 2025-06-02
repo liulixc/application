@@ -97,3 +97,14 @@ config ENABLE_BMS_SAMPLE
 if ENABLE_BMS_SAMPLE
 osource "application/samples/BMS/Kconfig"
 endif
+
+config ENABLE_SLE_GATE_SAMPLE
+    bool
+    prompt "Enable the Sample of SLE GATE."
+    default n
+    depends on SAMPLE_ENABLE
+    help
+        This option means enable the sample of SLE GATE.
+if ENABLE_SLE_GATE_SAMPLE
+osource "application/samples/sle_gate/Kconfig"
+endif

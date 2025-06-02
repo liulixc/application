@@ -3,8 +3,8 @@ set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/bms_slave_task/bms_slave.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306/ssd1306.c
     ${CMAKE_CURRENT_SOURCE_DIR}/ssd1306/ssd1306_fonts.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/sle_server/sle_server.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/sle_server/sle_server_adv.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_server/sle_uart_server.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/sle_server/sle_uart_server_adv.c
 )
 
 # 设置头文件目录列表

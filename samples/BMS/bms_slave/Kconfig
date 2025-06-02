@@ -2,3 +2,8 @@ config ADC_CHANNEL
     int
     prompt "Choose ADC channel."
     default 5
+
+config SUPPORT_SLE_PERIPHERAL
+    bool
+    default y
+

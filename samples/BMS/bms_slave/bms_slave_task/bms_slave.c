@@ -26,7 +26,7 @@
 #include "bms_slave.h"
 #include "malloc.h"
 #include "cJSON_Utils.h"
-#include "sle_server.h"
+#include "sle_uart_server.h"
 #include "pinctrl.h"
 #include "adc.h"
 #include "adc_porting.h"
@@ -537,7 +537,7 @@ int8_t LTC6804_rdcfg(uint8_t total_ic, //Number of ICs in the system
 void LTC6804_initialize(void)
 {   int i;    
     init_cfg();
-	set_adc(MD_FILTERED,DCP_ENABLED,CELL_CH_ALL,AUX_CH_ALL);//ADAX参数配置
+	set_adc(MD_NORMAL,DCP_ENABLED,CELL_CH_ALL,AUX_CH_ALL);//ADAX参数配置
     wakeup_sleep();
     osal_mdelay(2);
 	wakeup_idle();
@@ -1080,7 +1080,7 @@ void *bms_salve_task(void)
         msg.value = json_str;         // 指向 JSON 字符串
         msg.value_len = strlen(json_str);        // 字符串长度
         
-        sle_server_send_report_by_handle(msg);   // 通过 SLE 发送
+        sle_uart_server_send_report_by_handle(msg.value,msg.value_len);   // 通过 SLE 发送
         // 释放内存
         cJSON_Delete(root);
         free(json_str);

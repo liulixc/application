@@ -27,6 +27,7 @@
 #include "mqtt_demo.h"
 #include "l610.h"
 #include "sle_client.h"
+#include "monitor.h"
 
 // ======================== 配置参数 ========================
 
@@ -41,8 +42,6 @@
 extern char g_wifi_ssid[MAX_WIFI_SSID_LEN]; // 默认SSID
 extern char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN]; // 默认密码
 
-// char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
-// char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
 
 // 任务相关配置
 #define MQTT_STA_TASK_PRIO 24           // MQTT任务优先级
@@ -60,7 +59,7 @@ char *g_username = "680b91649314d11851158e8d_Battery01"; // 设备ID
 char *g_password = "50f670e657058bb33c23b92a633720a7fbbfba36f493f263c346b55bb2fb8bf3"; // 设备密码
 static MQTTClient client = NULL;                      // MQTT客户端实例
 extern int MQTTClient_init(void);       // MQTT客户端初始化函数声明
-volatile environment_msg g_env_msg; // 全局环境数据变量
+volatile environment_msg g_env_msg[5]; // 全局环境数据变量
 volatile MQTT_msg g_cmd_msg;        // 全局命令消息变量
 volatile int g_cmd_msg_flag = 0;    // 命令消息标志
 

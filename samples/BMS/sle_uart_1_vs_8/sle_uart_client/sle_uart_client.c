@@ -1,4 +1,11 @@
-
+/**
+ * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2023-2023. All rights reserved.
+ *
+ * Description: SLE uart sample of client. \n
+ *
+ * History: \n
+ * 2023-04-03, Create file. \n
+ */
 #include "common_def.h"
 #include "soc_osal.h"
 #include "securec.h"
@@ -7,11 +14,7 @@
 
 #include "sle_device_discovery.h"
 #include "sle_connection_manager.h"
-#include "sle_client.h"
-
-
-#include "cJSON.h"
-#include "mqtt_demo.h"
+#include "sle_uart_client.h"
 #define SLE_MTU_SIZE_DEFAULT            520
 #define SLE_SEEK_INTERVAL_DEFAULT       100
 #define SLE_SEEK_WINDOW_DEFAULT         100
@@ -34,8 +37,6 @@ static sle_addr_t g_sle_uart_remote_addr = { 0 };
 ssapc_write_param_t g_sle_uart_send_param = { 0 };
 uint16_t g_sle_uart_conn_id[SLE_UART_CLIENT_MAX_CON] = { 0 };
 uint16_t g_sle_uart_conn_num = 0;
-
-extern volatile environment_msg g_env_msg; // 全局环境消息变量
 
 
 ssapc_write_param_t *get_g_sle_uart_send_param(void)
@@ -233,6 +234,16 @@ void sle_uart_client_init(ssapc_notification_callback notification_cb, ssapc_ind
 }
 
 
+/**
+ * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2023-2023. All rights reserved.
+ *
+ * Description: SLE UART Sample Source. \n
+ *
+ * History: \n
+ * 2023-07-17, Create file. \n
+ */
+#include "common_def.h"
+#include "soc_osal.h"
 #include "app_init.h"
 #include "pinctrl.h"
 #include "uart.h"
@@ -241,9 +252,49 @@ void sle_uart_client_init(ssapc_notification_callback notification_cb, ssapc_ind
 #define SLE_UART_TASK_STACK_SIZE            0x600
 #include "sle_connection_manager.h"
 #include "sle_ssap_client.h"
-#include "sle_client.h"
-#define SLE_UART_TASK_PRIO                  17
+#include "sle_uart_client.h"
+#define SLE_UART_TASK_PRIO                  28
 #define SLE_UART_TASK_DURATION_MS           2000
+#define SLE_UART_BAUDRATE                   115200
+#define SLE_UART_TRANSFER_SIZE              512
+
+static uint8_t g_app_uart_rx_buff[SLE_UART_TRANSFER_SIZE] = { 0 };
+
+static uart_buffer_config_t g_app_uart_buffer_config = {
+    .rx_buffer = g_app_uart_rx_buff,
+    .rx_buffer_size = SLE_UART_TRANSFER_SIZE
+};
+
+static void uart_init_pin(void)
+{
+    if (CONFIG_SLE_UART_BUS == 0) {
+        uapi_pin_set_mode(CONFIG_UART_TXD_PIN, PIN_MODE_1);
+        uapi_pin_set_mode(CONFIG_UART_RXD_PIN, PIN_MODE_1);       
+    }else if (CONFIG_SLE_UART_BUS == 1) {
+        uapi_pin_set_mode(CONFIG_UART_TXD_PIN, PIN_MODE_1);
+        uapi_pin_set_mode(CONFIG_UART_RXD_PIN, PIN_MODE_1);       
+    }
+}
+
+static void uart_init_config(void)
+{
+    uart_attr_t attr = {
+        .baud_rate = SLE_UART_BAUDRATE,
+        .data_bits = UART_DATA_BIT_8,
+        .stop_bits = UART_STOP_BIT_1,
+        .parity = UART_PARITY_NONE
+    };
+
+    uart_pin_config_t pin_config = {
+        .tx_pin = CONFIG_UART_TXD_PIN,
+        .rx_pin = CONFIG_UART_RXD_PIN,
+        .cts_pin = PIN_NONE,
+        .rts_pin = PIN_NONE
+    };
+    uapi_uart_deinit(CONFIG_SLE_UART_BUS);
+    uapi_uart_init(CONFIG_SLE_UART_BUS, &pin_config, &attr, NULL, &g_app_uart_buffer_config);
+
+}
 
 
 void sle_uart_notification_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
@@ -252,102 +303,8 @@ void sle_uart_notification_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_
     unused(client_id);
     unused(conn_id);
     unused(status);
-    
-    if (data == NULL || data->data == NULL || data->data_len == 0) {
-        return;
-    }
-    // 简单打印接收的数据长度，不打印完整内容以避免日志缓冲区问题
-    printf("Received notification data from conn_id: %d, length: %d\r\n", conn_id, data->data_len);
-
-    char *json_str = NULL;
-    json_str = (char *)osal_vmalloc(data->data_len + 1);
-    if (json_str == NULL) {
-        printf("Failed to allocate memory for JSON string\r\n");
-        return;
-    }
-    // 复制数据到临时缓冲区并添加字符串结束符
-    if (memcpy_s(json_str, data->data_len + 1, data->data, data->data_len) != EOK) {
-        osal_vfree(json_str);
-        printf("Failed to copy JSON data\r\n");
-        return;
-    }
-    json_str[data->data_len] = '\0';
-    
-    // 使用cJSON解析JSON数据
-    cJSON *json = NULL;
-    json = cJSON_Parse(json_str);
-    if (json == NULL) {
-        printf("JSON parse failed\r\n");
-        osal_vfree(json_str);
-        return;
-    }
-
-    // cJSON *bms_id = cJSON_GetObjectItem(json, "BMS_ID");
-    // if (cJSON_IsNumber(bms_id)) {
-    //     g_env_msg.bms_id = bms_id->valueint;
-    //     printf("BMS_ID: %d from conn_id: %d\r\n", g_env_msg.bms_id, conn_id);
-    // } else {
-    //     printf("Invalid or missing BMS_ID field from conn_id: %d\r\n", conn_id);
-    //     // 设置默认值或使用连接ID作为标识
-    //     g_env_msg.bms_id = conn_id;
-    // }
-
-    
-    // 解析total_voltage
-    cJSON *total_voltage = cJSON_GetObjectItem(json, "total_voltage");
-    if (cJSON_IsNumber(total_voltage)) {
-        g_env_msg.total_voltage = total_voltage->valueint;
-        g_env_msg.current = total_voltage->valueint;
-    } else {
-        printf("Invalid or missing total_voltage field\r\n");
-    }
-
-
-    
-    // 解析cell_voltages数组
-    cJSON *cell_voltages = cJSON_GetObjectItem(json, "cell_voltages");
-    if (cJSON_IsArray(cell_voltages)) {
-        int size = cJSON_GetArraySize(cell_voltages);
-        int max_cells = sizeof(g_env_msg.cell_voltages)/sizeof(g_env_msg.cell_voltages[0]);
-        for (int i = 0; i < size && i < max_cells; i++) {
-            cJSON *item = cJSON_GetArrayItem(cell_voltages, i);
-            if (cJSON_IsNumber(item)) {
-                g_env_msg.cell_voltages[i] = item->valueint;
-            }
-        }
-    } else {
-        printf("Invalid or missing cell_voltages array\r\n");
-    }
-    
-    // 解析temperature数组
-    cJSON *temperature = cJSON_GetObjectItem(json, "temperature");
-    if (cJSON_IsArray(temperature)) {
-        int size = cJSON_GetArraySize(temperature);
-        int max_temps = sizeof(g_env_msg.temperature)/sizeof(g_env_msg.temperature[0]);
-        for (int i = 0; i < size && i < max_temps; i++) {
-            cJSON *item = cJSON_GetArrayItem(temperature, i);
-            if (cJSON_IsNumber(item)) {
-                g_env_msg.temperature[i] = item->valueint;
-            }
-        }
-    } else {
-        printf("Invalid or missing temperature array\r\n");
-    }
-    
-    // // 解析current
-    // cJSON *current = cJSON_GetObjectItem(json, "current");
-    // if (cJSON_IsNumber(current)) {
-    //     g_env_msg.current = current->valueint;  // 正确使用current变量
-    // } else {
-    //     printf("Invalid or missing current field\r\n");
-    // }
-    
-    
-    // 清理资源
-    cJSON_Delete(json);
-    osal_vfree(json_str);
-
     osal_printk("\n sle uart recived data : %s\r\n", data->data);
+    uapi_uart_write(CONFIG_SLE_UART_BUS, (uint8_t *)(data->data), data->data_len, 0);
 }
 
 void sle_uart_indication_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
@@ -357,15 +314,43 @@ void sle_uart_indication_cb(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
     unused(conn_id);
     unused(status);
     osal_printk("\n sle uart recived data : %s\r\n", data->data);
+    uapi_uart_write(CONFIG_SLE_UART_BUS, (uint8_t *)(data->data), data->data_len, 0);
 }
 
+static void sle_uart_client_read_int_handler(const void *buffer, uint16_t length, bool error)
+{
+    unused(error);
+
+    uint8_t *buff = (uint8_t *)buffer;
+    char num_str[2] = {buff[0], '\0'};                                  //把第一个字符当作conn_id
+    ssapc_write_param_t *sle_uart_send_param = get_g_sle_uart_send_param();
+    uint16_t g_sle_uart_conn_id = atoi(num_str);                            
+
+    osal_printk("\n sle_uart_client_read_int_handler: %d\r\n", g_sle_uart_conn_id);
+    sle_uart_send_param->data_len = length - 1;
+    sle_uart_send_param->data = (uint8_t *)buffer+1;                    // 调整数据指针，指向 buffer 的第二个字节
+    ssapc_write_req(0, g_sle_uart_conn_id, sle_uart_send_param);
+}
 
 static void *sle_uart_client_task(const char *arg)
 {
     unused(arg);
+    /* UART pinmux. */
+    uart_init_pin();
 
+    /* UART init config. */
+    uart_init_config();
+
+    uapi_uart_unregister_rx_callback(CONFIG_SLE_UART_BUS);
+    errcode_t ret = uapi_uart_register_rx_callback(CONFIG_SLE_UART_BUS,
+                                                   UART_RX_CONDITION_FULL_OR_IDLE,
+                                                   1, sle_uart_client_read_int_handler);
     sle_uart_client_init(sle_uart_notification_cb, sle_uart_indication_cb);
-
+    
+    if (ret != ERRCODE_SUCC) {
+        osal_printk("Register uart callback fail.");
+        return NULL;
+    }
 
     return NULL;
 }
@@ -376,12 +361,11 @@ static void sle_uart_entry(void)
     osal_task *task_handle = NULL;
     osal_kthread_lock();
 
-    
     task_handle = osal_kthread_create((osal_kthread_handler)sle_uart_client_task, 0, "SLEUartDongleTask",
                                       SLE_UART_TASK_STACK_SIZE);
+
     if (task_handle != NULL) {
         osal_kthread_set_priority(task_handle, SLE_UART_TASK_PRIO);
-        osal_kfree(task_handle);
     }
     osal_kthread_unlock();
 }
