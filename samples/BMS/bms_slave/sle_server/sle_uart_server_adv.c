@@ -131,7 +131,7 @@ static int sle_set_default_announce_param(void)
     errno_t ret;
     sle_announce_param_t param = {0};
     uint8_t index;
-    unsigned char local_addr[SLE_ADDR_LEN] = { 0x03, 0x02, 0x03, 0x04, 0x05, 0x01 };
+    unsigned char local_addr[SLE_ADDR_LEN] = { 0x11, 0x22, 0x33, 0x44, 0x55, 0x06 };
     param.announce_mode = SLE_ANNOUNCE_MODE_CONNECTABLE_SCANABLE;
     param.announce_handle = SLE_ADV_HANDLE_DEFAULT;
     param.announce_gt_role = SLE_ANNOUNCE_ROLE_T_CAN_NEGO;

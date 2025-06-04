@@ -1,5 +1,5 @@
 /*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2023-2023. All rights reserved.
+ * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2022. All rights reserved.
  *
  * Description: SLE private service register sample of client.
  */
@@ -39,13 +39,14 @@
 #define DELAY_500MS 500
 #define DELAY_5000MS 5000
 
-#define SERVER_IP_ADDR "***************.myhuaweicloud.com" // 接入地址 hostname
-#define SERVER_IP_PORT 1883                                // port 单片机一般使用MQTT，端口1883
-#define CLIENT_ID "sle_gate_0_0_2025033107"                // client_id
+
+#define SERVER_IP_ADDR "0857268db2.st1.iotda-device.cn-north-4.myhuaweicloud.com" // 接入地址 hostname
+#define SERVER_IP_PORT 1883                 // port 单片机一般使用MQTT，端口1883
+#define CLIENT_ID "sle_gate_0_0_2025033107" // client_id
 
 #define MQTT_CMDTOPIC_SUB "$oc/devices/sle_gate/sys/commands/set/#" // 平台下发命令  订阅主题
 
-#define MQTT_DATATOPIC_PUB "$oc/devices/sle_gate/sys/properties/report"                 // 属性上报topic 发布主题
+#define MQTT_DATATOPIC_PUB "$oc/devices/sle_gate/sys/properties/report" // 属性上报topic 发布主题
 #define MQTT_CLIENT_RESPONSE "$oc/devices/sle_gate/sys/commands/response/request_id=%s" // 命令响应topic
 
 #define DATA_SEVER_NAME "Switch"
@@ -65,7 +66,7 @@
 
 #ifdef IOT
 char *g_username = "sle_gate";
-char *g_password = "4d50d2ec*************a04312";
+char *g_password = "4d50d2ec1a5079f75efb3af74e9862ccdea5cb23941484e2cfb0be1647a04312";
 #endif
 
 enum {
@@ -124,6 +125,8 @@ static sle_addr_t g_sle_uart_remote_addr = {0};
 uint8_t wifi_if_connect = 0;
 
 uint8_t remote_addr_key[SLE_CONNNECT_MAX][2] = {0}; // 创建键值对
+
+extern int MQTTClient_init(void);
 
 //*******************sntp********************//
 void time_convert(time_t *rawtime, uint8_t *send_time)
@@ -257,10 +260,10 @@ int message_arrive(void *context, char *topicName, int topicLen, MQTTClient_mess
     uint8_t i = 0;
     for (i = 0; i <= connect_num; i++) {
         if (remote_addr_key[i][INDEX0] == 0x03) {
-            osal_printk("find KEY-> uuid : %d  con_id : %d", remote_addr_key[i][INDEX0], remote_addr_key[i][INDEX0]);
+            osal_printk("find KEY-> uuid : %d  con_id : %d\r\n", remote_addr_key[i][INDEX0], remote_addr_key[i][INDEX1]);
             param.data_len = len;
             param.data = data;
-            ssapc_write_req(0, remote_addr_key[i][INDEX0], &param); /*0 :client id */
+            ssapc_write_req(0, remote_addr_key[i][INDEX1], &param); /*0 :client id*/
             break;
         }
     }
@@ -288,7 +291,7 @@ void delivered(void *context, MQTTClient_deliveryToken dt)
 int mqtt_subscribe(const char *topic)
 {
     osal_printk("subscribe start!\r\n");
-    MQTTClient_subscribe(client, topic, 1); /*1 : qos */
+    MQTTClient_subscribe(client, topic, 1); /*1 : qos*/
     return 0;
 }
 //--------------------------------------------//
@@ -394,11 +397,13 @@ void queue_notification_deal_task(void)
     while (1) {
         status = osMessageQueueGet(MsgQueue_ID, &notify_data_get, 0, 0);
         if (status == osOK) {
-            osal_printk("con_id:%d queue deal :\r\n %s\r\n", notify_data_get.connect_id, notify_data_get.data);
+            osal_printk("con_id:%d queue deal :\r\n %d\r\n", notify_data_get.connect_id, notify_data_get.data[INDEX2]);
             if (notify_data_get.data[INDEX1] == 0x11) {
                 revert = notify_data_get.data[INDEX2];
+                uapi_uart_write(CONFIG_UART_BUS_ID,&revert,1,0);
             } else if (notify_data_get.data[INDEX1] == 0x22) {
                 voltage = notify_data_get.data[INDEX2];
+                uapi_uart_write(CONFIG_UART_BUS_ID,&voltage,1,0);
             }
         }
         osal_msleep(DELAY_500MS); // 每500ms处理一次队列中的数据

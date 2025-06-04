@@ -1018,39 +1018,6 @@ void *bms_salve_task(void)
         // osal_mdelay(10);
         // printf("Read Voltage return ֵ%d \r\n",r);//电压回读正常
         // osal_mdelay(10);
-        // printf("V1:%dv \r\n",(int)cell_codes[0][0]);
-        // osal_mdelay(10);
-        // printf("V2:%dv \r\n",(int)cell_codes[0][1]);
-        // osal_mdelay(10);
-        // printf("V3:%dv \r\n",(int)cell_codes[0][2]);
-        // osal_mdelay(10);
-        // printf("V4:%dv \r\n",(int)cell_codes[0][3]);
-        // osal_mdelay(10);
-        // printf("V5:%dv \r\n",(int)cell_codes[0][4]);
-        // osal_mdelay(10);
-        // printf("V6:%dv \r\n",(int)cell_codes[0][5]);
-        // osal_mdelay(10);
-        // printf("V7:%dv \r\n",(int)cell_codes[0][6]);
-        // osal_mdelay(10);
-        // printf("V8:%dv \r\n",(int)cell_codes[0][7]);
-        // osal_mdelay(10);
-        // printf("V9:%dv \r\n",(int)cell_codes[0][8]);
-        // osal_mdelay(10);
-        // printf("V10:%dv \r\n",(int)cell_codes[0][9]);
-        // osal_mdelay(10);
-        // printf("V11:%dv \r\n",(int)cell_codes[0][10]);
-        // osal_mdelay(10);
-        // printf("V12:%dv \r\n",(int)cell_codes[0][11]);
-        // osal_mdelay(10);
-        // printf("T1:%d \r\n",(int)gpiocode[0][0]);
-        // osal_mdelay(10);
-        // printf("T2:%d \r\n",(int)gpiocode[0][1]);
-        // osal_mdelay(10);
-        // printf("T3:%d \r\n",(int)gpiocode[0][2]);
-        // osal_mdelay(10);
-        // printf("T4:%d \r\n",(int)gpiocode[0][3]);
-        // osal_mdelay(10);
-        // printf("T5:%d \r\n",(int)gpiocode[0][4]);
 
         // 构建BMS JSON字符串，返回json字符串指针和长度，需外部释放
         // 构建 cell_voltages 数组
@@ -1068,7 +1035,6 @@ void *bms_salve_task(void)
         cJSON_AddNumberToObject(root, "total_voltage", MOD_VOL);
         cJSON_AddItemToObject(root, "cell_voltages", cell_voltages);
         cJSON_AddItemToObject(root, "temperature", temperatures);
-        cJSON_AddNumberToObject(root, "BMS_ID", 1);
         cJSON_AddNumberToObject(root, "current", 100);
         
         // 打印格式JSON

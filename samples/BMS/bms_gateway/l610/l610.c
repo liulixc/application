@@ -30,14 +30,11 @@ uart_recv uart2_recv = {0};
 // 互斥锁用于AT指令收发保护
 static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
 
-// 串口回调函数声明，防止编译报错
-void uart_read_handler(const void *buffer, uint16_t length, bool error);
-
 uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
 #define CMD_LEN 512
 char cmdSend[CMD_LEN];		//发送上报数据的AT指令
-uint32_t DefaultTimeout=1000;//超时
+uint32_t DefaultTimeout=500;//超时
 
 
 // 发送数据包
@@ -135,8 +132,6 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 		L610_SendCmd((uint8_t *) "AT\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
 		L610_SendCmd((uint8_t *) "AT+CSQ\r\n", (uint8_t *) "+CSQ", DefaultTimeout,isPrintf);
 		L610_SendCmd((uint8_t *) "AT+MIPCALL=1\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
-//		L610_SendCmd((uint8_t *) "AT+****\r\n", (uint8_t *) "***", DefaultTimeout, isPrintf);
-//		L610_SendCmd((uint8_t *) "AT+****\r\n", (uint8_t *) "***", DefaultTimeout, isPrintf);
 		printf("Attach!\r\n");
 	}
 }
@@ -147,11 +142,7 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 参数: uint8_t isPrintf: 是否打印Log
 */
 void L610_Detach(uint8_t isPrintf) {
-    // // 关闭TCP/UDP Socket
-    // L610_SendCmd("AT+MIPCLOSE=1\r\n", "OK", DefaultTimeout, isPrintf);
-    // // 关闭MQTT连接
-    // L610_SendCmd("AT+MQTTCLOSE=1\r\n", "OK", DefaultTimeout, isPrintf);
-    //关闭华为云连接（如有）
+
     L610_SendCmd("AT+HMDIS\r\n", "OK", DefaultTimeout, isPrintf);
 
     L610_SendCmd((uint8_t *) "AT+MIPCALL=0\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
@@ -182,17 +173,17 @@ void L610_ConnetMQTT(char *server_ip, char *server_port) {
 void L610_MQTTSub(char *topic) {
 	memset(cmdSend, 0, sizeof(cmdSend));
 	snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTSUB=1,%s,1\r\n", topic);
-	L610_SendCmd(cmdSend, "OK", 2000, isPrintf);
+	L610_SendCmd(cmdSend, "OK", DefaultTimeout, isPrintf);
 }
 
 void L610_MQTTPub(char *topic, char *msg) {
     memset(cmdSend, 0, sizeof(cmdSend));
     int len = strlen(msg);
     snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTPUB=1,%s,1,0,%d\r\n", topic, len);
-    L610_SendCmd(cmdSend, "", 2000, isPrintf);
+    L610_SendCmd(cmdSend, "", DefaultTimeout, isPrintf);
     char msgSend[256] = {0};
     snprintf(msgSend, sizeof(msgSend), "%s\r\n", msg);
-    L610_SendCmd(msgSend, "", 2000, isPrintf);
+    L610_SendCmd(msgSend, "", DefaultTimeout, isPrintf);
 }
 
 // 华为云平台MQTT连接
@@ -291,5 +282,11 @@ void L610_SendToken(char *token) {
 }
 
 
-
+void L610_Reset(void) {
+    if (l610_mutex) osal_mutex_lock(l610_mutex);
+    L610_SendCmd((uint8_t *) "AT+CFUN=1,1\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
+    osal_msleep(5000); // 等待重启完成
+    if (l610_mutex) osal_mutex_unlock(l610_mutex);
+    printf("L610 Reset!\r\n");
+}
 

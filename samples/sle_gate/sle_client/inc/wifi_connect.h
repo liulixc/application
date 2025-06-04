@@ -16,8 +16,8 @@
 #define WIFI_CONNECT_H
 #include "errcode.h"
 
-#define CONFIG_WIFI_SSID "test"  // 要连接的WiFi 热点账号
-#define CONFIG_WIFI_PWD "123456" // 要连接的WiFi 热点密码
+#define CONFIG_WIFI_SSID "QQ"  // 要连接的WiFi 热点账号
+#define CONFIG_WIFI_PWD "tangyuan" // 要连接的WiFi 热点密码
 
 errcode_t wifi_connect(void);
 #endif

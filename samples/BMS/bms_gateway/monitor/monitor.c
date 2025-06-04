@@ -192,7 +192,7 @@ static void *monitor_task(char *arg)
             osal_vfree(msg_data.value);
         }
     }
-        return NULL;
+    return NULL;
 }
 
 
@@ -201,9 +201,9 @@ static void monitor_entry(void)
 {
     osal_task *Monitor_task_handle = NULL;
     osal_kthread_lock();
-    int ret = osal_msg_queue_create("sle_msg", g_msg_rev_size, &g_msg_queue, 0, g_msg_rev_size);
+    int ret = osal_msg_queue_create("monitor", g_msg_rev_size, &g_msg_queue, 0, g_msg_rev_size);
     if (ret != OSAL_SUCCESS) {
-        printf("create queue failure!,error:%x\n", ret);
+        printf("create monitor queue failure!,error:%x\n", ret);
     }
 
     Monitor_task_handle =
