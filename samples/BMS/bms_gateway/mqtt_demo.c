@@ -366,18 +366,10 @@ int mqtt_task(void)
     
     // 组合上报主题字符串
     char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
-    if (!report_topic) {
-        printf("combine_strings failed for report_topic\n");
-        return -1;
-    }
 
     // 组合上报主题字符串
     char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
-    if (!report_topic) {
-        printf("combine_strings failed for report_topic\n");
-        return -1;
-    }
-    
+
 
     while (1) {
         // 检查WiFi配置是否发生变化
@@ -439,76 +431,66 @@ int mqtt_task(void)
             // 检查是否有活跃的BMS设备连接
             uint8_t active_count = get_active_device_count();
             if (active_count > 0) {
-                // 4G网络使用L610模块上报多设备数据
-                cJSON *root = cJSON_CreateObject();
-                cJSON *devices = cJSON_CreateArray();
+                // 4G网络由于AT指令长度限制，采用单设备网关格式逐个上报
+                int published_count = 0;
                 
-                // 遍历所有活跃设备
+                // 遍历所有活跃设备，单独上报每个设备（保持网关格式）
                 for (int i = 0; i < MAX_BMS_DEVICES; i++) {
                     if (g_bms_device_map[i].is_active) {
                         int idx = g_bms_device_map[i].device_index;
                         
-                        // 创建单个设备的JSON
-                        cJSON *device = cJSON_CreateObject();
-                        cJSON_AddStringToObject(device, "device_id", g_bms_device_map[i].cloud_device_id);
+                        // 使用sprintf构建网关格式的JSON字符串
+                        static char json_buffer[512]; // 单设备JSON缓冲区，足够容纳一个设备的数据
+                        char temp_str[128], cell_str[256]; // 临时字符串缓冲区
                         
-                        cJSON *services = cJSON_CreateArray();
-                        cJSON *service = cJSON_CreateObject();
-                        cJSON_AddStringToObject(service, "service_id", "ws63");
+                        // 构建温度数组字符串
+                        snprintf(temp_str, sizeof(temp_str), "[%.1f,%.1f,%.1f,%.1f,%.1f]",
+                                g_env_msg[idx].temperature[0], g_env_msg[idx].temperature[1],
+                                g_env_msg[idx].temperature[2], g_env_msg[idx].temperature[3],
+                                g_env_msg[idx].temperature[4]);
                         
-                        cJSON *props = cJSON_CreateObject();
+                        // 构建电池电压数组字符串
+                        snprintf(cell_str, sizeof(cell_str), 
+                                "[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f]",
+                                g_env_msg[idx].cell_voltages[0], g_env_msg[idx].cell_voltages[1],
+                                g_env_msg[idx].cell_voltages[2], g_env_msg[idx].cell_voltages[3],
+                                g_env_msg[idx].cell_voltages[4], g_env_msg[idx].cell_voltages[5],
+                                g_env_msg[idx].cell_voltages[6], g_env_msg[idx].cell_voltages[7],
+                                g_env_msg[idx].cell_voltages[8], g_env_msg[idx].cell_voltages[9],
+                                g_env_msg[idx].cell_voltages[10], g_env_msg[idx].cell_voltages[11]);
                         
-                        // 添加温度数组
-                        cJSON *temp_array = cJSON_CreateArray();
-                        for (int t = 0; t < 5; t++) {
-                            cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(g_env_msg[idx].temperature[t]));
+                        // 构建完整的网关格式JSON
+                        snprintf(json_buffer, sizeof(json_buffer),
+                                "{\"devices\":[{\"device_id\":\"%s\",\"services\":[{\"service_id\":\"ws63\","
+                                "\"properties\":{\"temperature\":%s,\"current\":%.2f,\"total_voltage\":%.2f,"
+                                "\"Switch\":false,\"cell_voltages\":%s}}]}]}",
+                                g_bms_device_map[i].cloud_device_id, temp_str, 
+                                g_env_msg[idx].current, g_env_msg[idx].total_voltage, cell_str);
+                        
+                        char *json_str = json_buffer;
+                        
+                        printf("[4G] Publishing gateway device %s data: %s\n", g_bms_device_map[i].cloud_device_id, json_str);
+                        
+                        if (gate_report_topic && json_str) {
+                            L610_HuaweiCloudReport(gate_report_topic, json_str);
+                            published_count++;
+                            printf("[L610] 网关设备 %s 4G上报成功\r\n", g_bms_device_map[i].cloud_device_id);
+                            
+                            // 设备间上报延时，避免L610模块负载过大
+                            osal_msleep(200);
+                        } else {
+                            printf("[L610] 网关设备 %s JSON生成或发送失败\r\n", g_bms_device_map[i].cloud_device_id);
                         }
-                        cJSON_AddItemToObject(props, "temperature", temp_array);
-                        
-                        // 添加其他属性
-                        cJSON_AddNumberToObject(props, "current", g_env_msg[idx].current);
-                        cJSON_AddNumberToObject(props, "total_voltage", g_env_msg[idx].total_voltage);
-                        cJSON_AddBoolToObject(props, "Switch", false);
-                        
-                        // 添加电池电压数组
-                        cJSON *cell_array = cJSON_CreateArray();
-                        for (int c = 0; c < 12; c++) {
-                            cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(g_env_msg[idx].cell_voltages[c]));
-                        }
-                        cJSON_AddItemToObject(props, "cell_voltages", cell_array);
-                        
-                        // 组装JSON
-                        cJSON_AddItemToObject(service, "properties", props);
-                        cJSON_AddItemToArray(services, service);
-                        cJSON_AddItemToObject(device, "services", services);
-                        cJSON_AddItemToArray(devices, device);
                     }
                 }
                 
-                cJSON_AddItemToObject(root, "devices", devices);
-                char *json_str = cJSON_Print(root);
-                
-                // 使用L610上报到华为云
-                char *l610_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
-                if (l610_topic && json_str) {
-                    L610_HuaweiCloudReport(l610_topic, json_str);
-                    printf("[HUAWEI CLOUD] 4G多设备上报成功，活跃设备数量：%d\r\n", active_count);
-                    free(l610_topic);
-                } else {
-                    printf("[HUAWEI CLOUD] 4G多设备上报失败：topic或payload生成失败\r\n");
-                }
-                
-                // 释放资源
-                cJSON_Delete(root);
-                if (json_str) free(json_str);
+                printf("[L610] 4G网关单设备上报完成，成功上报设备数量：%d/%d\r\n", published_count, active_count);
             } else {
                 printf("[L610] 跳过数据上报：无活跃BMS设备连接\r\n");
             }
-        } else {
-            printf("Warning: report_topic is NULL or network type unknown, skip publish\n");
         }
-
-        osal_msleep(1000);
+        
+        osal_msleep(500);
         loop_counter++;
     }
     

@@ -200,7 +200,7 @@ void L610_HuaweiCloudReport(char *topic, char *payload) {
     memset(cmdSend, 0, sizeof(cmdSend));
     int payload_len = strlen(payload); // 只算原始JSON长度
     // 构造转义后的payload
-    char payload_escaped[512] = {0};
+    char payload_escaped[1024] = {0};
     int j = 0;
     for (int i = 0; payload[i] != '\0' && j < sizeof(payload_escaped) - 1; i++) {
         if (payload[i] == '"' && j < sizeof(payload_escaped) - 2) {
