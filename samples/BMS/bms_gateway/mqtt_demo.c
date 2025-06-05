@@ -24,6 +24,7 @@
 #include "wifi_connect.h"
 #include "watchdog.h"
 #include "cjson_demo.h"
+#include "cJSON.h"  // 包含cJSON库头文件
 #include "mqtt_demo.h"
 #include "l610.h"
 #include "sle_client.h"  // 包含SLE客户端头文件，提供设备映射结构定义
@@ -44,7 +45,7 @@ extern char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN]; // 默认密码
 
 
 // 任务相关配置
-#define MQTT_STA_TASK_PRIO 24           // MQTT任务优先级
+#define MQTT_STA_TASK_PRIO 17           // MQTT任务优先级
 #define MQTT_STA_TASK_STACK_SIZE 0x2000 // MQTT任务栈大小
 #define TIMEOUT 10000L                  // 超时时间：10秒
 
@@ -65,6 +66,7 @@ extern int MQTTClient_init(void);       // MQTT客户端初始化函数声明
 
 volatile MQTT_msg g_cmd_msg;        // 全局命令消息变量
 volatile int g_cmd_msg_flag = 0;    // 命令消息标志
+extern int wifi_msg_flag; // WiFi配置修改标志
 
 // 最大支持的BMS设备数
 #define MAX_BMS_DEVICES 8
@@ -378,6 +380,19 @@ int mqtt_task(void)
     
 
     while (1) {
+        // 检查WiFi配置是否发生变化
+        if (wifi_msg_flag) {
+            printf("[WiFi重连] 检测到WiFi配置变化，开始重连流程\n");
+            if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
+                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
+                } else {
+                    printf("[网络管理] 连接WiFi失败，继续使用4G\\n");
+                }
+            // 清除WiFi配置变化标志
+            wifi_msg_flag = 0;
+            printf("[WiFi重连] WiFi重连流程完成\n");
+        }
+        
         // 处理下发命令
         if (g_cmd_msg_flag) {
             if (g_cmd_msg.receive_payload[0] != '\0') {

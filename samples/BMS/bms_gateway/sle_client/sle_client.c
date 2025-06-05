@@ -160,7 +160,6 @@ static int allocate_device_index(uint16_t conn_id, const sle_addr_t *device_addr
             
             // 初始化对应的数据结构
             memset(&g_env_msg[i], 0, sizeof(environment_msg));
-            g_env_msg[i].bms_id = conn_id;  // 使用conn_id作为默认BMS_ID
             
             printf("Allocated device index %d for conn_id %d (MAC: %02x:%02x:%02x:%02x:%02x:%02x)\r\n", 
                    i, conn_id, 
@@ -637,9 +636,9 @@ static void process_bms_json_data(uint8_t *data, uint16_t data_len, uint16_t con
         }
     }
 
-    printf("Updated BMS[%d] data: conn_id=%d, total_voltage=%d, current=%d, bms_id=%d\r\n", 
+    printf("Updated BMS[%d] data: conn_id=%d, total_voltage=%d, current=%d\r\n", 
            device_index, conn_id, g_env_msg[device_index].total_voltage, 
-           g_env_msg[device_index].current, g_env_msg[device_index].bms_id);
+           g_env_msg[device_index].current);
 
     // 清理资源
     cJSON_Delete(json);

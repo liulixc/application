@@ -21,6 +21,7 @@ uint8_t uart_rx_bufferNew[UART_RX_MAX];
 
 char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
 char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
+int wifi_msg_flag = 0; // WiFi修改标志位
 
 /* 串口接收回调 */
 void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool error)
@@ -129,17 +130,12 @@ static void *monitor_task(char *arg)
                         cJSON *ssid = cJSON_GetObjectItem(json, "SSID");
                         if (!cJSON_IsString(ssid)) {
                             printf("Invalid or missing SSID field\r\n");
-                            char response[] = "{\"status\":\"error\",\"msg\":\"invalid_ssid\"}\n";
-                            uart_send_buff((uint8_t *)response, strlen(response));
-                            break;
                         }
                         
                         // 解析密码
                         cJSON *password = cJSON_GetObjectItem(json, "password");
                         if (!cJSON_IsString(password)) {
                             printf("Invalid or missing password field\r\n");
-                            char response[] = "{\"status\":\"error\",\"msg\":\"invalid_password\"}\n";
-                            uart_send_buff((uint8_t *)response, strlen(response));
                             break;
                         }
                         
@@ -147,29 +143,22 @@ static void *monitor_task(char *arg)
                         if (strlen(ssid->valuestring) >= MAX_WIFI_SSID_LEN ||
                             strlen(password->valuestring) >= MAX_WIFI_PASSWORD_LEN) {
                             printf("WiFi credentials too long\r\n");
-                            char response[] = "{\"status\":\"error\",\"msg\":\"credentials_too_long\"}\n";
-                            uart_send_buff((uint8_t *)response, strlen(response));
                             break;
                         }
-                        
-                        // 更新全局WiFi配置
-                        if (strcpy_s(g_wifi_ssid, MAX_WIFI_SSID_LEN, ssid->valuestring) == EOK &&
-                            strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
-                            
-                            printf("WiFi config updated - SSID: %s, Password: %s\r\n", 
-                                   g_wifi_ssid, g_wifi_pwd);
-                            
-                            // 发送成功响应
-                            char response[] = "{\"status\":\"success\",\"msg\":\"wifi_config_updated\"}\n";
-                            uart_send_buff((uint8_t *)response, strlen(response));
-                            
-                            // 可以在这里触发WiFi重连接等操作
-                            // TODO: 调用WiFi配置更新函数，重新连接WiFi
-                            
+
+                        // 判断是否有变化
+                        int need_update = strcmp(g_wifi_ssid, ssid->valuestring) != 0 || strcmp(g_wifi_pwd, password->valuestring) != 0;
+                        if (need_update) {
+                            if (strcpy_s(g_wifi_ssid, MAX_WIFI_SSID_LEN, ssid->valuestring) == EOK &&
+                                strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
+                                wifi_msg_flag = 1;
+                                printf("WiFi config updated - SSID: %s, Password: %s\r\n", g_wifi_ssid, g_wifi_pwd);
+                                // TODO: 调用WiFi配置更新函数，重新连接WiFi
+                            } else {
+                                printf("Failed to update WiFi configuration\r\n");
+                            }
                         } else {
-                            printf("Failed to update WiFi configuration\r\n");
-                            char response[] = "{\"status\":\"error\",\"msg\":\"update_failed\"}\n";
-                            uart_send_buff((uint8_t *)response, strlen(response));
+                            printf("WiFi配置未变化, 不触发重连\r\n");
                         }
                         break;
                     }
@@ -182,8 +171,6 @@ static void *monitor_task(char *arg)
                 }
             } else {
                 printf("Invalid or missing cmd field\r\n");
-                char response[] = "{\"status\":\"error\",\"msg\":\"invalid_cmd\"}\n";
-                uart_send_buff((uint8_t *)response, strlen(response));
             }
             
             // 清理资源

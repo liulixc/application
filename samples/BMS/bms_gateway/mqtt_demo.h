@@ -17,7 +17,6 @@ typedef struct {
 } MQTT_msg;
 
 typedef struct {
-    int bms_id; // 设备ID
     float temperature[5]; // 温度
     float current;     // 电流
     float cell_voltages[12]; // 单体电压

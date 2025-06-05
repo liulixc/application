@@ -12,11 +12,6 @@
 #include "sle_ssap_client.h"
 
 
-// 预定义的MAC地址与云设备ID映射关系
-typedef struct {
-    uint8_t mac[6];
-    char device_id[64];
-} mac_device_mapping_t;
 
 // 添加设备映射管理结构
 typedef struct {
