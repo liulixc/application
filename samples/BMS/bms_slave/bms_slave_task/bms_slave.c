@@ -1051,7 +1051,7 @@ void *bms_salve_task(void)
         cJSON_Delete(root);
         free(json_str);
         
-        osal_mdelay(1000);
+        osal_mdelay(500);
     }
     return 0;
 }

@@ -108,3 +108,14 @@ config ENABLE_SLE_GATE_SAMPLE
 if ENABLE_SLE_GATE_SAMPLE
 osource "application/samples/sle_gate/Kconfig"
 endif
+
+config ENABLE_SLE_HYBRID
+    bool
+    prompt "Enable the Sample of hybrid."
+    default n
+    depends on SAMPLE_ENABLE
+    help
+        This option means enable the sample of SLE GATE CLIENT.
+if ENABLE_SLE_HYBRID
+osource "application/samples/hybrid_demo/Kconfig"
+endif

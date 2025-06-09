@@ -128,9 +128,6 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
 
 void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 	if (isReboot== 1) {
-		L610_SendCmd((uint8_t *) "AT+CIMI\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
-		L610_SendCmd((uint8_t *) "AT\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
-		L610_SendCmd((uint8_t *) "AT+CSQ\r\n", (uint8_t *) "+CSQ", DefaultTimeout,isPrintf);
 		L610_SendCmd((uint8_t *) "AT+MIPCALL=1\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
 		printf("Attach!\r\n");
 	}

@@ -184,8 +184,6 @@ int mqtt_publish_multi_device(const char *topic)
     cJSON_AddItemToObject(root, "devices", devices);
     char *json_str = cJSON_Print(root);
     
-    printf("Publishing multi-device data: %s\n", json_str);
-    
     // 发布消息
     pubmsg.payload = json_str;
     pubmsg.payloadlen = strlen(json_str);
@@ -336,6 +334,7 @@ void switch_to_4g(void)
  */
 int mqtt_task(void)
 {
+    
     app_uart_init_config();// 初始化4G串口
     int ret = 0;
     char *beep_status = NULL;
@@ -469,7 +468,7 @@ int mqtt_task(void)
                         
                         char *json_str = json_buffer;
                         
-                        printf("[4G] Publishing gateway device %s data: %s\n", g_bms_device_map[i].cloud_device_id, json_str);
+                        printf("[4G] Publishing gateway device %s", g_bms_device_map[i].cloud_device_id);
                         
                         if (gate_report_topic && json_str) {
                             L610_HuaweiCloudReport(gate_report_topic, json_str);

@@ -416,7 +416,6 @@ void sle_uart_server_register_msg(sle_uart_server_msg_queue sle_uart_server_msg)
 #define SLE_UART_TASK_PRIO                  17
 #define SLE_UART_TASK_DURATION_MS           2000
 
-
 #define SLE_UART_SERVER_DELAY_COUNT         5
 
 #define SLE_UART_TASK_STACK_SIZE            0x1200

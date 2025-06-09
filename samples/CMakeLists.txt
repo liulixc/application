@@ -40,6 +40,10 @@ if(DEFINED CONFIG_ENABLE_SLE_GATE_SAMPLE)
     add_subdirectory_if_exist(sle_gate) # 添加SLE网关样例
 endif()
 
+if(DEFINED CONFIG_ENABLE_SLE_HYBRID)
+    add_subdirectory_if_exist(hybrid_demo) # 添加HiLink样例
+endif()
+
 set(PRIVATE_HEADER
 ) # 私有头文件列表
 
@@ -80,5 +84,6 @@ install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/bt/sle" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/Farsight" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/BMS" "*")
 install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/sle_gate" "*")
+install_sdk("${CMAKE_CURRENT_SOURCE_DIR}/hybrid_demo" "*")
 
 build_component() # 构建该组件

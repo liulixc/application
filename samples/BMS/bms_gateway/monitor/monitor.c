@@ -10,8 +10,11 @@
 #include "mqtt_demo.h"
 #include "wifi_connect.h"
 #include "monitor.h"
+#include "sle_client.h"
+#include "mqtt_demo.h"
 
 #define UART_SIZE_DEFAULT 1024
+#define MAX_BMS_DEVICES 8  // 设备数量上限
 
 unsigned long g_msg_queue = 0;
 unsigned int g_msg_rev_size = sizeof(msg_data_t);
@@ -22,6 +25,10 @@ uint8_t uart_rx_bufferNew[UART_RX_MAX];
 char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
 char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
 int wifi_msg_flag = 0; // WiFi修改标志位
+
+// 外部变量声明
+extern volatile environment_msg g_env_msg[MAX_BMS_DEVICES];
+extern bms_device_map_t g_bms_device_map[MAX_BMS_DEVICES];
 
 /* 串口接收回调 */
 void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool error)
@@ -70,6 +77,98 @@ static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
     return ret;
 }
 
+static void *monitorTX_task(char *arg)
+{
+    unused(arg);
+    
+    // 外部声明
+    extern volatile environment_msg g_env_msg[];
+    extern bms_device_map_t g_bms_device_map[];
+    extern uint8_t get_active_device_count(void);
+    
+    while (1) {
+        // 检查是否有活跃的BMS设备连接
+        uint8_t active_count = get_active_device_count();
+        if (active_count > 0) {
+            // 创建根JSON对象
+            cJSON *root = cJSON_CreateObject();
+            cJSON *devices = cJSON_CreateArray();
+            
+            // 遍历所有活跃设备
+            for (int i = 0; i < MAX_BMS_DEVICES; i++) {
+                if (g_bms_device_map[i].is_active) {
+                    int idx = g_bms_device_map[i].device_index;
+                    
+                    // 创建单个设备的JSON
+                    cJSON *device = cJSON_CreateObject();
+                    cJSON_AddStringToObject(device, "device_id", g_bms_device_map[i].cloud_device_id);
+                    
+                    cJSON *services = cJSON_CreateArray();
+                    cJSON *service = cJSON_CreateObject();
+                    cJSON_AddStringToObject(service, "service_id", "ws63");
+                    
+                    cJSON *props = cJSON_CreateObject();
+                    
+                    // 添加温度数组，限制为小数点后一位
+                    cJSON *temp_array = cJSON_CreateArray();
+                    char temp_buffer[16];
+                    for (int t = 0; t < 5; t++) {
+                        snprintf(temp_buffer, sizeof(temp_buffer), "%.4f", g_env_msg[idx].temperature[t]/500.0f);
+                        cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(atof(temp_buffer)));
+                    }
+                    cJSON_AddItemToObject(props, "temperature", temp_array);
+                    
+                    // 添加其他属性
+                    // 使用格式化方式限制小数点后两位
+                    char num_buffer[16];
+                    
+                    // 格式化电流，限制为小数点后两位
+                    snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].current/100.0f);
+                    cJSON_AddNumberToObject(props, "current", atof(num_buffer));
+                    
+                    // 格式化总电压，限制为小数点后两位
+                    snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].total_voltage/10000.0f);
+                    cJSON_AddNumberToObject(props, "total_voltage", atof(num_buffer));
+                    
+                    cJSON_AddBoolToObject(props, "Switch", false);
+                    
+                    // 添加电池电压数组，每个电压值限制为小数点后两位
+                    cJSON *cell_array = cJSON_CreateArray();
+                    for (int c = 0; c < 12; c++) {
+                        // 格式化单体电压，限制为小数点后两位
+                        snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].cell_voltages[c]/10000.0f);
+                        cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(atof(num_buffer)));
+                    }
+                    cJSON_AddItemToObject(props, "cell_voltages", cell_array);
+                    
+                    // 组装JSON
+                    cJSON_AddItemToObject(service, "properties", props);
+                    cJSON_AddItemToArray(services, service);
+                    cJSON_AddItemToObject(device, "services", services);
+                    cJSON_AddItemToArray(devices, device);
+                }
+            }
+            
+            cJSON_AddItemToObject(root, "devices", devices);
+            char *json_str = cJSON_PrintUnformatted(root);
+            
+            // 发送JSON数据到串口屏
+            uart_send_buff((uint8_t *)json_str, strlen(json_str));
+            printf("串口发送BMS数据成功,活跃设备数量:%d\r\n", active_count);
+                
+            cJSON_free(json_str);
+        
+            
+            // 释放资源
+            cJSON_Delete(root);
+        } else {
+            printf("串口任务跳过数据上报:无活跃BMS设备连接\r\n");
+        }
+        
+        osal_msleep(1000); // 每隔1秒发送一次数据
+    }
+    return NULL;
+}
 
 static void *monitor_task(char *arg)
 {
@@ -147,7 +246,7 @@ static void *monitor_task(char *arg)
                         }
 
                         // 判断是否有变化
-                        int need_update = strcmp(g_wifi_ssid, ssid->valuestring) != 0 || strcmp(g_wifi_pwd, password->valuestring) != 0;
+                        int need_update = strcmp(g_wifi_ssid, ssid->valuestring) != 0 || strcmp(g_wifi_pwd, password->valuestring ) != 0;
                         if (need_update) {
                             if (strcpy_s(g_wifi_ssid, MAX_WIFI_SSID_LEN, ssid->valuestring) == EOK &&
                                 strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
@@ -187,6 +286,7 @@ static void *monitor_task(char *arg)
 static void monitor_entry(void)
 {
     osal_task *Monitor_task_handle = NULL;
+    osal_task *task_handle = NULL;
     osal_kthread_lock();
     int ret = osal_msg_queue_create("monitor", g_msg_rev_size, &g_msg_queue, 0, g_msg_rev_size);
     if (ret != OSAL_SUCCESS) {
@@ -199,6 +299,13 @@ static void monitor_entry(void)
         osal_kthread_set_priority(Monitor_task_handle, MONITOR_TASK_PRIO);
         osal_kfree(Monitor_task_handle);
     }
+
+    task_handle = osal_kthread_create((osal_kthread_handler)monitorTX_task, 0, "monitorTX_task", MONITOR_STACK_SIZE);
+    if (task_handle != NULL) {
+        osal_kthread_set_priority(task_handle, MONITOR_TASK_PRIO);
+        osal_kfree(task_handle);
+    }
+
     osal_kthread_unlock();
 }
 
