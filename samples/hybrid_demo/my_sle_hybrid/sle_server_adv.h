@@ -1,47 +1,28 @@
-/*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd.. 2023. All rights reserved.
- *
- * Description: SLE ADV Config.
- */
-
-/**
- * @defgroup bluetooth_sle_adv API
- * @ingroup
- * @{
- */
-
 #ifndef SLE_SERVER_ADV_H
 #define SLE_SERVER_ADV_H
 
-/* 广播ID */
-#define SLE_ADV_HANDLE_DEFAULT                    1
 
+#define SLE_ADV_HANDLE_DEFAULT                    1
 /**
- * @if Eng
- * @brief Definitaion of BLE ADV 通用广播结构.
- * @else
  * @brief SLE 广播普通数据结构。
  * @endif
  */
-struct sle_adv_common_value {
-    uint8_t length;
+typedef struct sle_adv_common_value {
     uint8_t type;
+    uint8_t length;
     uint8_t value;
-};
+} le_adv_common_t;
 
 /**
- * @if Eng
- * @brief Definitaion of BLE ADV Channel mapping.
- * @else
  * @brief SLE 广播信道映射。
  * @endif
  */
-typedef enum {
+typedef enum sle_adv_channel {
     SLE_ADV_CHANNEL_MAP_77                 = 0x01,
     SLE_ADV_CHANNEL_MAP_78                 = 0x02,
     SLE_ADV_CHANNEL_MAP_79                 = 0x04,
     SLE_ADV_CHANNEL_MAP_DEFAULT            = 0x07
-} sle_adv_channel_map;
+} sle_adv_channel_map_t;
 
 /**
  * @if Eng
@@ -71,14 +52,6 @@ typedef enum {
 
 
 /**
- * @if Eng
- * @brief  sle adv data config.
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li NULL
- * @else
  * @brief  sle广播数据配置。
  * @attention  NULL
  * @retval ERRCODE_SLE_SUCCESS    执行成功
@@ -88,4 +61,6 @@ typedef enum {
  * @endif
  */
 errcode_t sle_uuid_server_adv_init(void);
+errcode_t sle_server_set_and_update_mesh_adv_data(const uint8_t *data, uint16_t len);
+// errcode_t sle_announce_register_cbks(void);
 #endif

@@ -1,7 +1,3 @@
-/*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd.. 2023. All rights reserved.
- * Description: sle uuid server sample.
- */
 #include "securec.h"
 #include "errcode.h"
 #include "osal_addr.h"
@@ -52,25 +48,14 @@ uint16_t g_property_handle = 0;
 static uint8_t sle_uuid_base[] = { 0x37, 0xBE, 0xA8, 0x80, 0xFC, 0x70, 0x11, 0xEA, \
     0xB7, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-gpio_level_t LED_state = 0;
-//uint8_t string_LED[30];
-uint8_t LED_data[] = {0xAA,0x11,0x00,0xFF};
-
-void LED_init(void)
-{
-    uapi_pin_set_mode(CONFIG_BLINKY_PIN, HAL_PIO_FUNC_GPIO);
-
-    uapi_gpio_set_dir(CONFIG_BLINKY_PIN, GPIO_DIRECTION_OUTPUT);
-    uapi_gpio_set_val(CONFIG_BLINKY_PIN, GPIO_LEVEL_LOW);
-}
+char test[10] = "test2";
 
 void LED_Control_report_task(void)
 {
     while(1)
     {
-        //sprintf_s((char *)string_LED,sizeof(string_LED),"LED state :%d",uapi_gpio_get_output_val(GPIO_02));
-        LED_data[2] = (uint8_t)uapi_gpio_get_output_val((GPIO_02));
-        sle_uuid_server_send_report_by_handle(LED_data,sizeof(LED_data));
+
+        sle_uuid_server_send_report_by_handle(test,sizeof(test));
         osal_msleep(2000);
     }
 }
@@ -114,16 +99,6 @@ static void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_r
     osal_printk("[uuid server] ssaps write request cbk server_id:%x, conn_id:%x, handle:%x, status:%x\r\n",
         server_id, conn_id, write_cb_para->handle, status);
     osal_printk("write request data: %s\r\n",write_cb_para->value);
-    if(osal_strstr((char *)write_cb_para->value,"true") != NULL)
-    {
-        LED_state = 1;
-        uapi_gpio_set_val(GPIO_02,LED_state);
-    }
-    else if(osal_strstr((char *)write_cb_para->value,"false") != NULL)
-    {
-        LED_state = 0;
-        uapi_gpio_set_val(GPIO_02,LED_state);
-    }
 }
 
 static void ssaps_mtu_changed_cbk(uint8_t server_id, uint16_t conn_id,  ssap_exchange_info_t *mtu_size,
@@ -250,7 +225,7 @@ static errcode_t sle_uuid_server_add(void)
     return ERRCODE_SLE_SUCCESS;
 }
 
-/* device閫氳繃uuid鍚慼ost鍙戦�佹暟鎹細report */
+/* device通过uuid向host发送数据：report */
 errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len)
 {
     ssaps_ntf_ind_by_uuid_t param = {0};
@@ -274,7 +249,7 @@ errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len)
     return ERRCODE_SLE_SUCCESS;
 }
 
-/* device閫氳繃handle鍚慼ost鍙戦�佹暟鎹細report */
+/* device通过handle向host发送数据：report */
 errcode_t sle_uuid_server_send_report_by_handle(const uint8_t *data, uint8_t len)
 {
     ssaps_ntf_ind_t param = {0};
@@ -326,10 +301,9 @@ static void sle_conn_register_cbks(void)
     sle_connection_register_callbacks(&conn_cbks);
 }
 
-/* 鍒濆鍖杣uid server */
+/* 初始化uuid server */
 errcode_t sle_uuid_server_init(void)
 {
-    LED_init();
     blinky_entry();
     enable_sle();
     sle_conn_register_cbks();

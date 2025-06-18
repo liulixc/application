@@ -10,10 +10,11 @@
 #include "sle_device_discovery.h"
 #include "sle_errcode.h"
 #include "sle_server_adv.h"
+#include "sle_mesh.h"
 
-
+    
 /* sle device name */
-#define NAME_MAX_LENGTH 15
+#define NAME_MAX_LENGTH 16
 /* 连接调度间隔12.5ms，单位125us */
 #define SLE_CONN_INTV_MIN_DEFAULT                 0x64
 /* 连接调度间隔12.5ms，单位125us */
@@ -31,8 +32,13 @@
 /* 最大广播数据长度 */
 #define SLE_ADV_DATA_LEN_MAX                      251
 /* 广播名称 */
-uint8_t sle_local_name[ NAME_MAX_LENGTH] = { 's', 'l', 'e', '_', 'u', 'u', 'i', 'd', '_', 's',
-    'e', 'r', 'v', 'e', 'r' };
+static uint8_t sle_local_name[NAME_MAX_LENGTH] = "hybrid_n_node";
+
+/* Max mesh data len */
+#define MESH_MAX_ADV_DATA_LEN 200
+
+static uint8_t g_mesh_adv_data[MESH_MAX_ADV_DATA_LEN] = {0};
+static uint16_t g_mesh_adv_data_len = 0;
 
 static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
 {
@@ -49,7 +55,7 @@ static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
     adv_data[index++] = SLE_ADV_DATA_TYPE_COMPLETE_LOCAL_NAME;
     ret = memcpy_s(&adv_data[index], max_len - index, local_name, local_name_len);
     if (ret != EOK) {
-        osal_printk("memcpy fail\r\n");
+        osal_printk("[sle_set_adv_local_name] memcpy fail\r\n");
         return 0;
     }
     return (uint16_t)index + local_name_len;
@@ -89,6 +95,7 @@ static uint16_t sle_set_adv_data(uint8_t *adv_data)
     return idx;
 }
 
+
 static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
 {
     uint16_t idx = 0;
@@ -109,6 +116,21 @@ static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
 
     /* set local name */
     idx += sle_set_adv_local_name(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx);
+
+    /* Add mesh data */
+    if (g_mesh_adv_data_len > 0) {
+        uint8_t mesh_field_len = 1 + 2 + g_mesh_adv_data_len; /* type + company_id + data */
+        scan_rsp_data[idx++] = mesh_field_len; 
+        scan_rsp_data[idx++] = SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA;
+        scan_rsp_data[idx++] = (uint8_t)MESH_COMPANY_ID;
+        scan_rsp_data[idx++] = (uint8_t)(MESH_COMPANY_ID >> 8);
+        ret = memcpy_s(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx, g_mesh_adv_data, g_mesh_adv_data_len);
+        if (ret != EOK) {
+            osal_printk("memcpy fail for mesh data\r\n");
+            return idx;
+        }
+        idx += g_mesh_adv_data_len;
+    }
     return idx;
 }
 
@@ -116,7 +138,10 @@ static int sle_set_default_announce_param(void)
 {
     errcode_t ret = 0;
     sle_announce_param_t param = {0};
+    uint8_t index;
+
     unsigned char local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x08 };
+    random_mac_addr(local_addr); 
     param.announce_mode = SLE_ANNOUNCE_MODE_CONNECTABLE_SCANABLE;
     param.announce_handle = SLE_ADV_HANDLE_DEFAULT;
     param.announce_gt_role = SLE_ANNOUNCE_ROLE_T_CAN_NEGO;
@@ -157,9 +182,9 @@ static int sle_set_default_announce_data(void)
 
     ret = sle_set_announce_data(adv_handle, &data);
     if (ret == ERRCODE_SLE_SUCCESS) {
-        osal_printk("[SLE DD SDK] set announce data success.");
+        osal_printk("[SLE DD SDK] set announce data success.\r\n");
     } else {
-        osal_printk("[SLE DD SDK] set adv param fail.");
+        osal_printk("[SLE DD SDK] set adv param fail.\r\n");
     }
     return ERRCODE_SLE_SUCCESS;
 }
@@ -184,15 +209,15 @@ void sle_enable_cbk(errcode_t status)
     osal_printk("sle enable status:%02x\r\n", status);
 }
 
-void sle_announce_register_cbks(void)
-{
-    sle_announce_seek_callbacks_t seek_cbks = {0};
-    seek_cbks.announce_enable_cb = sle_server_announce_enable_cbk;
-    seek_cbks.announce_disable_cb = sle_server_announce_disable_cbk;
-    seek_cbks.announce_terminal_cb = sle_server_announce_terminal_cbk;
-    seek_cbks.sle_enable_cb = sle_enable_cbk;
-    sle_announce_seek_register_callbacks(&seek_cbks);
-}
+// void sle_announce_register_cbks(void)
+// {
+//     sle_announce_seek_callbacks_t seek_cbks = {0};
+//     seek_cbks.announce_enable_cb = sle_server_announce_enable_cbk;
+//     seek_cbks.announce_disable_cb = sle_server_announce_disable_cbk;
+//     seek_cbks.announce_terminal_cb = sle_server_announce_terminal_cbk;
+//     seek_cbks.sle_enable_cb = sle_enable_cbk;
+//     sle_announce_seek_register_callbacks(&seek_cbks);
+// }
 
 errcode_t sle_uuid_server_adv_init(void)
 {
@@ -203,4 +228,19 @@ errcode_t sle_uuid_server_adv_init(void)
     sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
     osal_printk("sle_uuid_server_adv_init out\r\n");
     return ERRCODE_SLE_SUCCESS;
+}
+
+errcode_t sle_server_set_and_update_mesh_adv_data(const uint8_t *data, uint16_t len)
+{
+    if (len > MESH_MAX_ADV_DATA_LEN) {
+        return ERRCODE_FAIL;
+    }
+    (void)memset_s(g_mesh_adv_data, sizeof(g_mesh_adv_data), 0, sizeof(g_mesh_adv_data));
+    errno_t ret = memcpy_s(g_mesh_adv_data, sizeof(g_mesh_adv_data), data, len);
+    if (ret != EOK) {
+        g_mesh_adv_data_len = 0;
+        return ERRCODE_FAIL;
+    }
+    g_mesh_adv_data_len = len;
+    return sle_set_default_announce_data();
 }

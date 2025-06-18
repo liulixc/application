@@ -1,13 +1,4 @@
-/**
- * Copyright (c) dt-sir
- *
- * Description: callbacks register. \n
- *              This file is to register all sle callbacks which were used. \n
- *              本文件实现了SLE协议所有回调函数的注册管理，支持混合模式下的客户端和服务端功能。\n
- *
- * History: \n
- * 2025-04-08, Create file. \n
- */
+
 #include "string.h"
 #include "soc_osal.h"
 #include "sle_errcode.h"
@@ -28,9 +19,9 @@ sle_connection_callbacks_t g_sle_connect_cbk = {0};  // 连接管理回调结构体
 // 外部函数声明，这些函数分别在客户端和服务端模块中实现
 // 服务端相关回调函数
 extern void sle_server_sle_enable_cbk(errcode_t status);
-extern void sle_client_sle_enable_cbk(errcode_t status);
 extern void sle_server_sle_disable_cbk(errcode_t status);
 extern void sle_client_sle_disable_cbk(errcode_t status);
+
 extern void sle_server_announce_enable_cbk(uint32_t announce_id, errcode_t status);
 extern void sle_server_announce_disable_cbk(uint32_t announce_id, errcode_t status);
 extern void sle_server_announce_terminal_cbk(uint32_t announce_id);
@@ -91,17 +82,18 @@ static errcode_t sle_announce_seek_register_cbks(void)
 // 服务端连接相关回调
 extern void sle_server_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
+
 // 客户端连接相关回调
 extern void sle_client_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
-    sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
-extern void sle_client_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status);
+sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
+
 // 连接参数更新和其他服务端回调
 extern void sle_server_connect_param_update_req_cbk(uint16_t conn_id, errcode_t status, const sle_connection_param_update_req_t *param);
-extern void sle_server_connect_param_update_cbk(uint16_t conn_id, errcode_t status,
-    const sle_connection_param_update_evt_t *param);
+extern void sle_server_connect_param_update_cbk(uint16_t conn_id, errcode_t status,const sle_connection_param_update_evt_t *param);
 extern void sle_server_auth_complete_cbk(uint16_t conn_id, const sle_addr_type_t *addr, errcode_t status, const sle_auth_info_evt_t *evt);
+extern void sle_server_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status);
 extern void sle_server_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status);
-void sle_server_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status);
+
 
 /**
  * @brief 连接状态变化回调函数
@@ -118,49 +110,30 @@ static void connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     osal_printk("[connect_state_changed_cbk] mac: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
            addr->addr[0], addr->addr[1], addr->addr[2], addr->addr[3], addr->addr[4], addr->addr[5]);
 
+    uint8_t remote_server_addr_match = 0;
     // 获取远程服务器地址，用于判断连接类型
     sle_addr_t *remote_server_addr = sle_get_remote_server_addr();
-    if(memcmp(addr,remote_server_addr,sizeof(sle_addr_t)) != 0)
+    for (uint8_t i = 0; i < sle_get_num_remote_server_addr(); i++)
     {
-        // 地址不匹配远程服务器，作为服务端处理此连接
-        osal_printk("\r\n[connect cbk]: addr != remote-server-addr\r\n");
+        if (memcmp(addr, &remote_server_addr[i], sizeof(sle_addr_t)) == 0) 
+        {
+            remote_server_addr_match = 1;
+            break;
+        }
+    }
+
+    if (remote_server_addr_match == 0) 
+    {
         sle_server_connect_state_changed_cbk(conn_id, addr, conn_state, pair_state, disc_reason);
     }
     else 
     {
-        // 地址匹配远程服务器，作为客户端处理此连接
-        osal_printk("\r\n[connect cbk]: addr == remote-server-addr\r\n");
         sle_client_connect_state_changed_cbk(conn_id, addr, conn_state, pair_state, disc_reason);
     }
+
 }
 
-/**
- * @brief 配对完成回调函数
- * @param conn_id 连接ID
- * @param addr 设备地址
- * @param status 配对结果状态码
- * @note 同样通过比较MAC地址判断是服务端还是客户端的配对，并调用对应的回调函数
- */
-static void sle_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
-{
-    osal_printk("[sle_pair_complete_cbk] mac: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
-           addr->addr[0], addr->addr[1], addr->addr[2], addr->addr[3], addr->addr[4], addr->addr[5]);
 
-    // 获取远程服务器地址，用于判断配对类型
-    sle_addr_t *remote_server_addr = sle_get_remote_server_addr();
-    if(memcmp(addr,remote_server_addr,sizeof(sle_addr_t)) != 0)
-    {
-        // 地址不匹配远程服务器，作为服务端处理此配对
-        osal_printk("\r\n[connect cbk]: addr != remote-server-addr\r\n");
-        sle_server_pair_complete_cbk(conn_id, addr,status);
-    }
-    else 
-    {
-        // 地址匹配远程服务器，作为客户端处理此配对
-        osal_printk("\r\n[connect cbk]: addr == remote-server-addr\r\n");
-        sle_client_pair_complete_cbk(conn_id, addr, status);
-    }
-}
 
 /**
  * @brief 注册连接管理相关的回调函数
@@ -176,10 +149,10 @@ static errcode_t sle_conn_register_cbks(void)
     // 注册连接参数更新相关回调
     g_sle_connect_cbk.connect_param_update_cb = sle_server_connect_param_update_cbk;
     g_sle_connect_cbk.connect_param_update_req_cb = sle_server_connect_param_update_req_cbk;
-    //g_sle_connect_cbk.auth_complete_cb = sle_server_auth_complete_cbk; // 当前未使用认证完成回调
+    g_sle_connect_cbk.auth_complete_cb = sle_server_auth_complete_cbk; // 当前未使用认证完成回调
     
     // 注册配对完成和信号强度回调
-    g_sle_connect_cbk.pair_complete_cb = sle_pair_complete_cbk;
+    g_sle_connect_cbk.pair_complete_cb = sle_server_pair_complete_cbk;
     g_sle_connect_cbk.read_rssi_cb = sle_server_read_rssi_cbk;
 
     // 向SLE协议栈注册连接回调结构体

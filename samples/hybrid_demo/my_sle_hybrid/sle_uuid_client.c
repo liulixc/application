@@ -11,43 +11,84 @@
 #include "sle_connection_manager.h"
 #include "sle_ssap_client.h"
 #include "sle_uuid_client.h"
+#include "sle_mesh.h"
 
 #undef THIS_FILE_ID
-#define THIS_FILE_ID BTH_GLE_SAMPLE_UUID_CLIENT
+#define THIS_FILE_ID BTH_GLE_SAMPLE_UUID_CLIENT//这是干嘛的，没看懂一点ty
 
-#define SLE_MTU_SIZE_DEFAULT        300
+#define SLE_MTU_SIZE_DEFAULT        512
 #define SLE_SEEK_INTERVAL_DEFAULT   100
 #define SLE_SEEK_WINDOW_DEFAULT     100
 #define UUID_16BIT_LEN 2
 #define UUID_128BIT_LEN 16
 
-sle_announce_seek_callbacks_t g_seek_cbk = {0};
-sle_connection_callbacks_t    g_connect_cbk = {0};
-ssapc_callbacks_t             g_ssapc_cbk = {0};
-sle_addr_t                    g_remote_addr = {0};
-uint16_t                      g_conn_id = 0;
-ssapc_find_service_result_t   g_find_service_result = {0};
+#define SLE_TASK_DELAY_MS 1000        
+#define SLE_CLIENT_LOG "[sle client]" 
+static char g_sle_uuid_app_uuid[] = {0x39, 0xBE, 0xA8, 0x80, 0xFC, 0x70, 0x11, 0xEA,
+                                     0xB7, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+static sle_conn_and_service_t g_conn_and_service_arr[128] = {0};
+
+uint8_t g_num_conn = 0;
+
+static ssapc_callbacks_t g_sle_ssapc_cbk = {0};
+
+sle_addr_t g_sle_remote_server_addr[128] = {0};
+
+uint8_t g_num_remote_server_addr = 0;
+
+ssapc_write_param_t g_sle_send_param = {0};
+
+uint8_t g_client_id = 0;
+
 char g_sle_server_name[128] = "";
-uint8_t g_sle_service_found = 0;
 
 
-sle_acb_state_t g_sle_hybridc_conn_state = SLE_ACB_STATE_NONE;
-
-void sle_set_remote_server_name(char *name)
-{
-    memcpy_s(g_sle_server_name,strlen(name),name,strlen(name));
-}
 
 sle_addr_t *sle_get_remote_server_addr(void)
 {
-    return &g_remote_addr;
+    return &g_sle_remote_server_addr;
 }
 
-void sle_sample_sle_enable_cbk(errcode_t status)
+uint8_t sle_get_num_remote_server_addr(void)
+{
+    return g_num_remote_server_addr;
+}
+
+void sle_set_server_name(char *name)
+{
+    memcpy_s(g_sle_server_name, strlen(name), name, strlen(name));
+}
+
+sle_conn_and_service_t *sle_get_conn_and_service(void)
+{
+    return g_conn_and_service_arr;
+}
+
+void sle_start_scan()
+{
+    sle_seek_param_t param = {0};
+    param.own_addr_type = SLE_ADDRESS_TYPE_PUBLIC;
+    param.filter_duplicates = 0;
+    param.seek_filter_policy = SLE_SEEK_FILTER_ALLOW_ALL;
+    param.seek_phys = SLE_SEEK_PHY_1M;
+    param.seek_type[0] = SLE_SEEK_ACTIVE;
+    param.seek_interval[0] = SLE_SEEK_INTERVAL_DEFAULT;
+    param.seek_window[0] = SLE_SEEK_WINDOW_DEFAULT;
+    sle_set_seek_param(&param);
+    sle_start_seek();
+}
+
+void sle_client_sle_enable_cbk(errcode_t status)
 {
     if (status == 0) {
         sle_start_scan();
     }
+}
+
+void sle_client_sle_disable_cbk(errcode_t status)
+{
+    printf("%s [sle_client_sle_disable_cbk]\r\n", SLE_CLIENT_LOG);
 }
 
 void sle_client_sample_seek_enable_cbk(errcode_t status)
@@ -59,211 +100,271 @@ void sle_client_sample_seek_enable_cbk(errcode_t status)
 
 void sle_client_sample_seek_disable_cbk(errcode_t status)
 {
-    if (status == 0) {
-        sle_connect_remote_device(&g_remote_addr);
-    }
+
 }
 
 void sle_client_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_data)
 {
-    if (seek_result_data != NULL) {
-        (void)memcpy_s(&g_remote_addr, sizeof(sle_addr_t), &seek_result_data->addr, sizeof(sle_addr_t));
-        sle_stop_seek();
+    if (seek_result_data == NULL)
+    {
+        osal_printk("%s [sle_client_seek_result_cbk] seek_result_data is NULL\r\n", SLE_CLIENT_LOG);
+        return;
+    }
+
+    uint8_t *data = seek_result_data->data;
+    uint16_t data_len = seek_result_data->data_len;
+    uint16_t offset = 0;
+
+    while (offset < data_len) {
+        uint8_t field_len = data[offset];
+        uint8_t field_type = data[offset + 1];
+
+        if (field_len == 0) {
+            break;
+        }
+
+        if (field_type == SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA) {
+            // Pass manufacturer data (type + company_id + payload) to mesh processor
+            sle_mesh_process_adv_packet(&seek_result_data->addr, &data[offset + 1], field_len);
+        }
+        offset += (field_len + 1);
     }
 }
 
-void sle_sample_seek_cbk_register(void)
-{
-    g_seek_cbk.sle_enable_cb = sle_sample_sle_enable_cbk;
-    g_seek_cbk.seek_enable_cb = sle_client_sample_seek_enable_cbk;
-    g_seek_cbk.seek_disable_cb = sle_client_sample_seek_disable_cbk;
-    g_seek_cbk.seek_result_cb = sle_client_sample_seek_result_info_cbk;
-}
+// void sle_sample_seek_cbk_register(void)
+// {
+//     g_seek_cbk.sle_enable_cb = sle_sample_sle_enable_cbk;
+//     g_seek_cbk.seek_enable_cb = sle_client_sample_seek_enable_cbk;
+//     g_seek_cbk.seek_disable_cb = sle_client_sample_seek_disable_cbk;
+//     g_seek_cbk.seek_result_cb = sle_client_sample_seek_result_info_cbk;
+// }
 
 void sle_client_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason)
 {
-    g_sle_hybridc_conn_state = conn_state; 
     osal_printk("[ssap client] conn state changed conn_id:%d, addr:%02x***%02x%02x\n", conn_id, addr->addr[0],
         addr->addr[4], addr->addr[5]); /* 0 4 5: addr index */
     
     if (conn_state == SLE_ACB_STATE_CONNECTED) 
     {
         osal_printk("[sle_client_connect_state_changed_cbk] SLE_ACB_STATE_CONNECTED\r\n");
-        g_conn_id = conn_id;
-        if (pair_state == SLE_PAIR_NONE) 
-        {
-            sle_pair_remote_device(&g_remote_addr);
-        }
+        g_num_conn++;
+        ssap_exchange_info_t info = {0};
+        info.mtu_size = SLE_MTU_SIZE_DEFAULT;
+        info.version = 1;
+        ssapc_exchange_info_req(0, conn_id, &info);
+
     }
     else if(conn_state == SLE_ACB_STATE_NONE)
     {
         osal_printk("[sle_client_connect_state_changed_cbk] SLE_ACB_STATE_NONE\r\n");
-
-        g_sle_service_found = 0;
     }
     else if(conn_state == SLE_ACB_STATE_DISCONNECTED)
     {
-        sle_remove_paired_remote_device(addr);
-        sle_start_scan();
+         for (int i = 0; i < g_num_conn; i++)
+        {
+            if (g_conn_and_service_arr[i].conn_id == conn_id) 
+            {
+                
+                int j;
+                for (j = i; j < g_num_conn - 1; j++)
+                {
+                    g_conn_and_service_arr[j] = g_conn_and_service_arr[j + 1];
+                }
+                
+                memset(&g_conn_and_service_arr[j], 0, sizeof(sle_conn_and_service_t));
+                
+                g_num_conn--;
+            }
+        }
+
+        for (int i = 0; i < g_num_remote_server_addr; i++)
+        {
+            if (memcmp(&g_sle_remote_server_addr[i], addr, sizeof(sle_addr_t)) == 0) 
+            {
+                
+                int j;
+                for (j = i; j < g_num_remote_server_addr - 1; j++)
+                {
+                    g_sle_remote_server_addr[j] = g_sle_remote_server_addr[j + 1];
+                }
+                
+                memset(&g_sle_remote_server_addr[j], 0, sizeof(sle_addr_t));
+                
+                g_num_remote_server_addr--;
+            }
+        }
         osal_printk("sle disconnected,disreason : %d\r\n",disc_reason);
     }
 }
 
-void sle_client_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
-{
-    osal_printk("[ssap client] pair complete conn_id:%d, addr:%02x***%02x%02x\n", conn_id, addr->addr[0],
-        addr->addr[4], addr->addr[5]); /* 0 4 5: addr index */
-    if (status == 0) {
-        ssap_exchange_info_t info = {0};
-        info.mtu_size = SLE_MTU_SIZE_DEFAULT;
-        info.version = 1;
-        ssapc_exchange_info_req(1, g_conn_id, &info);
-    }
-}
+// void sle_client_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
+// {
+//     osal_printk("[ssap client] pair complete conn_id:%d, addr:%02x***%02x%02x\n", conn_id, addr->addr[0],
+//         addr->addr[4], addr->addr[5]); /* 0 4 5: addr index */
+//     if (status == 0) {
+//         ssap_exchange_info_t info = {0};
+//         info.mtu_size = SLE_MTU_SIZE_DEFAULT;
+//         info.version = 1;
+//         ssapc_exchange_info_req(1, g_conn_id, &info);
+//     }
+// }
 
-void sle_sample_connect_cbk_register(void)
-{
-    g_connect_cbk.connect_state_changed_cb = sle_client_connect_state_changed_cbk;
-    g_connect_cbk.pair_complete_cb = sle_client_pair_complete_cbk;
-}
+// void sle_sample_connect_cbk_register(void)
+// {
+//     g_connect_cbk.connect_state_changed_cb = sle_client_connect_state_changed_cbk;
+//     g_connect_cbk.pair_complete_cb = sle_client_pair_complete_cbk;
+// }
 
-void sle_sample_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exchange_info_t *param,
+void sle_client_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exchange_info_t *param,
     errcode_t status)
 {
     osal_printk("[ssap client] pair complete client id:%d status:%d\n", client_id, status);
     osal_printk("[ssap client] exchange mtu, mtu size: %d, version: %d.\n",
         param->mtu_size, param->version);
-
-    ssapc_find_structure_param_t find_param = {0};
-    find_param.type = SSAP_FIND_TYPE_PRIMARY_SERVICE;
-    find_param.start_hdl = 1;
-    find_param.end_hdl = 0xFFFF;
-    ssapc_find_structure(0, conn_id, &find_param);
+    if (status == ERRCODE_SUCC)
+    {
+        ssapc_find_structure_param_t find_param = {0};
+        find_param.type = SSAP_FIND_TYPE_PRIMARY_SERVICE;
+        find_param.start_hdl = 1;
+        find_param.end_hdl = 0xFFFF;
+        ssapc_find_structure(client_id, conn_id, &find_param);
+    }
 }
 
-void sle_sample_find_structure_cbk(uint8_t client_id, uint16_t conn_id, ssapc_find_service_result_t *service,
+void sle_client_find_structure_cbk(uint8_t client_id, uint16_t conn_id, ssapc_find_service_result_t *service,
     errcode_t status)
 {
     osal_printk("[ssap client] find structure cbk client: %d conn_id:%d status: %d \n",
         client_id, conn_id, status);
     osal_printk("[ssap client] find structure start_hdl:[0x%02x], end_hdl:[0x%02x], uuid len:%d\r\n",
         service->start_hdl, service->end_hdl, service->uuid.len);
-    if (service->uuid.len == UUID_16BIT_LEN) {
-        osal_printk("[ssap client] structure uuid:[0x%02x][0x%02x]\r\n",
-            service->uuid.uuid[14], service->uuid.uuid[15]); /* 14 15: uuid index */
-    } else {
-        for (uint8_t idx = 0; idx < UUID_128BIT_LEN; idx++) {
-            osal_printk("[ssap client] structure uuid[%d]:[0x%02x]\r\n", idx, service->uuid.uuid[idx]);
-        }
-    }
-    g_find_service_result.start_hdl = service->start_hdl;
-    g_find_service_result.end_hdl = service->end_hdl;
-    g_sle_service_found = 1;
-    memcpy_s(&g_find_service_result.uuid, sizeof(sle_uuid_t), &service->uuid, sizeof(sle_uuid_t));
-}
-
-void sle_sample_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
-    ssapc_find_structure_result_t *structure_result, errcode_t status)
-{
-    osal_printk("[ssap client] find structure cmp cbk client id:%d status:%d type:%d uuid len:%d \r\n",
-        client_id, status, structure_result->type, structure_result->uuid.len);
-    if (structure_result->uuid.len == UUID_16BIT_LEN) {
-        osal_printk("[ssap client] find structure cmp cbk structure uuid:[0x%02x][0x%02x]\r\n",
-            structure_result->uuid.uuid[14], structure_result->uuid.uuid[15]); /* 14 15: uuid index */
-    } else {
-        for (uint8_t idx = 0; idx < UUID_128BIT_LEN; idx++) {
-            osal_printk("[ssap client] find structure cmp cbk structure uuid[%d]:[0x%02x]\r\n", idx,
-                structure_result->uuid.uuid[idx]);
+    
+    if (status == ERRCODE_SUCC)
+    {
+        
+        for (int i = 0; i < g_num_conn; i++)
+        {
+            if (g_conn_and_service_arr[i].conn_id == conn_id) 
+            {
+                
+                g_conn_and_service_arr[i].find_service_result.start_hdl = service->start_hdl;
+                
+                g_conn_and_service_arr[i].find_service_result.end_hdl = service->end_hdl;
+                
+                memcpy_s(&g_conn_and_service_arr[i].find_service_result.uuid, sizeof(sle_uuid_t),
+                         &service->uuid, sizeof(sle_uuid_t));
+            }
         }
     }
 }
 
-void sle_sample_find_property_cbk(uint8_t client_id, uint16_t conn_id,
-    ssapc_find_property_result_t *property, errcode_t status)
+static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
+                                              ssapc_find_structure_result_t *structure_result,
+                                              errcode_t status)
 {
-    osal_printk("[ssap client] find property cbk, client id: %d, conn id: %d, operate ind: %d, "
-        "descriptors count: %d status:%d.\n", client_id, conn_id, property->operate_indication,
-        property->descriptors_count, status);
-    for (uint16_t idx = 0; idx < property->descriptors_count; idx++) {
-        osal_printk("[ssap client] find property cbk, descriptors type [%d]: 0x%02x.\n",
-            idx, property->descriptors_type[idx]);
-    }
-    if (property->uuid.len == UUID_16BIT_LEN) {
-        osal_printk("[ssap client] find property cbk, uuid: %02x %02x.\n",
-            property->uuid.uuid[14], property->uuid.uuid[15]); /* 14 15: uuid index */
-    } else if (property->uuid.len == UUID_128BIT_LEN) {
-        for (uint16_t idx = 0; idx < UUID_128BIT_LEN; idx++) {
-            osal_printk("[ssap client] find property cbk, uuid [%d]: %02x.\n",
-                idx, property->uuid.uuid[idx]);
-        }
-    }
-}
-
-void sle_sample_write_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_write_result_t *write_result,
-    errcode_t status)
-{   
-    osal_printk("[ssap client] write cfm cbk, client id: %d status:%d.\n", client_id, status);
-    ssapc_read_req(0, conn_id, write_result->handle, write_result->type);
-}
-
-void sle_sample_read_cfm_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *read_data,
-    errcode_t status)
-{
-    osal_printk("[ssap client] read cfm cbk client id: %d conn id: %d status: %d\n",
-        client_id, conn_id, status);
-    osal_printk("[ssap client] read cfm cbk handle: %d, type: %d , len: %d\n",
-        read_data->handle, read_data->type, read_data->data_len);
-    for (uint16_t idx = 0; idx < read_data->data_len; idx++) {
-        osal_printk("[ssap client] read cfm cbk[%d] 0x%02x\r\n", idx, read_data->data[idx]);
-    }
-}
-
-void sle_sample_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
-    errcode_t status)
-{
-    unused(client_id);
     unused(conn_id);
-    unused(status);
-    osal_printk("[client]recv:data_len:%d\r\n",data->data_len);
-    osal_printk("[client]recv data : %s\r\n",data->data);
+
+    osal_printk("%s [sle_client_find_structure_cmp_cbk] client id:%d status:%d type:%d uuid len:%d \r\n",
+                SLE_CLIENT_LOG, client_id, status, structure_result->type, structure_result->uuid.len);
 }
 
-void sle_sample_ssapc_cbk_register(void)
+static void sle_client_find_property_cbk(uint8_t client_id, uint16_t conn_id,
+                                         ssapc_find_property_result_t *property, errcode_t status)
 {
-    g_ssapc_cbk.exchange_info_cb = sle_sample_exchange_info_cbk;
-    g_ssapc_cbk.find_structure_cb = sle_sample_find_structure_cbk;
-    g_ssapc_cbk.find_structure_cmp_cb = sle_sample_find_structure_cmp_cbk;
-    g_ssapc_cbk.ssapc_find_property_cbk = sle_sample_find_property_cbk;
-    g_ssapc_cbk.write_cfm_cb = sle_sample_write_cfm_cbk;
-    g_ssapc_cbk.read_cfm_cb = sle_sample_read_cfm_cbk;
-    g_ssapc_cbk.notification_cb = sle_sample_notification_cbk;
-    //g_ssapc_cbk.indication_cb = sle_sample_indication_cbk;
+    osal_printk("%s [sle_client_find_property_cbk] client id: %d, conn id: %d, operate ind: %d, "
+                "descriptors count: %d status:%d property->handle %d\r\n",
+                SLE_CLIENT_LOG,
+                client_id, conn_id, property->operate_indication,
+                property->descriptors_count, status, property->handle);
+    g_sle_send_param.handle = property->handle;
+    g_sle_send_param.type = SSAP_PROPERTY_TYPE_VALUE; 
 }
 
-void sle_client_init()
+static void sle_client_write_cfm_cbk(uint8_t client_id, uint16_t conn_id,
+                                     ssapc_write_result_t *write_result, errcode_t status)
 {
-    sle_sample_seek_cbk_register();
-    sle_sample_connect_cbk_register();
-    sle_sample_ssapc_cbk_register();
-    sle_announce_seek_register_callbacks(&g_seek_cbk);
-    sle_connection_register_callbacks(&g_connect_cbk);
-    ssapc_register_callbacks(&g_ssapc_cbk);
+    
 }
 
-void sle_start_scan()
+static void sle_client_read_cfm_cbk(uint8_t client_id, uint16_t conn_id,
+                                    ssapc_handle_value_t *read_data, errcode_t status)
 {
-    sle_seek_param_t param = {0};
-    param.own_addr_type = 0;
-    param.filter_duplicates = 0;
-    param.seek_filter_policy = 0;
-    param.seek_phys = 1;
-    param.seek_type[0] = 0;
-    param.seek_interval[0] = SLE_SEEK_INTERVAL_DEFAULT;
-    param.seek_window[0] = SLE_SEEK_WINDOW_DEFAULT;
-    sle_set_seek_param(&param);
-    sle_start_seek();
+    osal_printk("[sle_client_read_cfm_cbk] client id:0x%x conn id:0x%x status:0x%x\r\n", client_id, conn_id, status);
+    osal_printk("[sle_client_read_cfm_cbk] handle:0x%x, type:0x%x, len:0x%x\r\n", read_data->handle, read_data->type,
+                read_data->data_len);
+    for (uint16_t idx = 0; idx < read_data->data_len; idx++)
+    {
+        osal_printk("[sle_client_read_cfm_cbk] [0x%x] 0x%02x\r\n", idx, read_data->data[idx]);
+    }
 }
+
+void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
+                            errcode_t status)
+{
+    (void)client_id;
+    (void)conn_id;
+    (void)status;
+
+    data->data[data->data_len - 1] = '\0';
+    printf("[ssapc_notification_cbk] server_send_data: %s\r\n", data->data);
+}
+
+void ssapc_indication_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
+                          errcode_t status)
+{
+    (void)client_id;
+    (void)conn_id;
+    (void)status;
+
+    data->data[data->data_len - 1] = '\0';
+    printf("[ssapc_indication_cbk] server_send_data: %s\r\n", data->data);
+}
+
+static void sle_client_ssapc_cbk_register(ssapc_notification_callback ssapc_notification_cbk,
+                                          ssapc_indication_callback ssapc_indication_cbk)
+{
+    g_sle_ssapc_cbk.exchange_info_cb = sle_client_exchange_info_cbk;           
+    g_sle_ssapc_cbk.find_structure_cb = sle_client_find_structure_cbk;         
+    g_sle_ssapc_cbk.ssapc_find_property_cbk = sle_client_find_property_cbk;    
+    g_sle_ssapc_cbk.find_structure_cmp_cb = sle_client_find_structure_cmp_cbk; 
+    g_sle_ssapc_cbk.write_cfm_cb = sle_client_write_cfm_cbk;                   
+    g_sle_ssapc_cbk.read_cfm_cb = sle_client_read_cfm_cbk;                     
+    g_sle_ssapc_cbk.notification_cb = ssapc_notification_cbk;                  
+    g_sle_ssapc_cbk.indication_cb = ssapc_indication_cbk;                      
+    ssapc_register_callbacks(&g_sle_ssapc_cbk);                                
+}
+
+static errcode_t sle_uuid_client_register(void)
+{
+    errcode_t ret;
+
+    sle_uuid_t app_uuid = {0};
+    printf("[uuid client] ssapc_register_client \r\n");
+    app_uuid.len = sizeof(g_sle_uuid_app_uuid);
+    if (memcpy_s(app_uuid.uuid, app_uuid.len, g_sle_uuid_app_uuid, sizeof(g_sle_uuid_app_uuid)) != EOK)
+    {
+        return ERRCODE_FAIL;
+    }
+
+    ret = ssapc_register_client(&app_uuid, &g_client_id);
+
+    return ret;
+}
+
+
+
+// void sle_client_init()
+// {
+//     sle_sample_seek_cbk_register();
+//     sle_sample_connect_cbk_register();
+//     sle_sample_ssapc_cbk_register();
+//     sle_announce_seek_register_callbacks(&g_seek_cbk);
+//     sle_connection_register_callbacks(&g_connect_cbk);
+//     ssapc_register_callbacks(&g_ssapc_cbk);
+// }
+
+
 
 //*************hybrid******************//
 errcode_t sle_client_send_report_by_handle(const uint8_t *data, uint8_t len)
@@ -271,87 +372,43 @@ errcode_t sle_client_send_report_by_handle(const uint8_t *data, uint8_t len)
     
     ssapc_write_param_t param = {0};  
 
-    param.handle = g_find_service_result.start_hdl;
-
-    param.type = SSAP_PROPERTY_TYPE_VALUE;
-
-    param.data_len = len + 1; 
-
-    param.data = osal_vmalloc(param.data_len);
-    if (param.data == NULL)
+    int ret = 0;
+    for (int i = 0; i < g_num_conn; i++)
     {
-        osal_printk("[sle_client_send_report_by_handle] osal_vmalloc fail\r\n");
-        return ERRCODE_SUCC;
-    }
-    if (memcpy_s(param.data, param.data_len, data, len) != EOK)
-    {
+        
+        if (g_conn_and_service_arr[i].find_service_result.start_hdl == 0)
+        {
+            continue; 
+        }
+
+        param.handle = g_conn_and_service_arr[i].find_service_result.start_hdl;
+
+        param.type = SSAP_PROPERTY_TYPE_VALUE;
+
+        param.data_len = len + 1; 
+
+        param.data = osal_vmalloc(param.data_len);
+        if (param.data == NULL)
+        {
+            printf("[sle_client_send_report_by_handle] osal_vmalloc fail\r\n");
+            return ERRCODE_FAIL;
+        }
+        if (memcpy_s(param.data, param.data_len, data, len) != EOK)
+        {
+            osal_vfree(param.data);
+            return ERRCODE_FAIL;
+        }
+
+        ret = SsapWriteReq(g_client_id, g_conn_and_service_arr[i].conn_id, &param);
+        if (ret != ERRCODE_SUCC)
+        {
+            printf("SsapWriteReq error:%d connid:%d\r\n", ret, g_conn_and_service_arr[i].conn_id);
+        }
+
         osal_vfree(param.data);
-        return ERRCODE_SUCC;
     }
 
-    if(ssapc_write_req(0, g_conn_id, &param) != ERRCODE_SUCC)
-    {
-        osal_printk("[sle_client_send_report_by_handle] SsapWriteReq fail\r\n");
-        osal_vfree(param.data);
-        return ERRCODE_SUCC;
-    }
-
-    osal_vfree(param.data);
     return ERRCODE_SUCC;
-}
-
-errcode_t sle_hybridC_init(void)
-{
-    errcode_t ret = 0;
-    sle_sample_ssapc_cbk_register();
-    ret = ssapc_register_callbacks(&g_ssapc_cbk);
-    if(ret != ERRCODE_SUCC)
-    {
-        osal_printk("[sle_hybridC] : sle client init fali\r\n");
-        return ret;
-    }
-    osal_printk("[sle_hybridC] : sle client init succ\r\n");
-    return ret;
-}
-
-void sle_client_sle_enable_cbk(errcode_t status)
-{
-    if (status != ERRCODE_SUCC)
-    {
-        osal_printk("[sle_client_sle_enable_cbk] status error\r\n");
-    }
-    else
-    {
-        osal_printk("[sle_client_sle_enable_cbk] status success\r\n");
-        osal_msleep(1000);
-        sle_start_scan();
-    }
-}
-
-void sle_client_sle_disable_cbk(errcode_t status)
-{
-    unused(status);
-    osal_printk("[sle_disable_cbk]:client\r\n");
-}
-
-void sle_set_hybridc_addr(void)
-{
-    uint8_t local_addr[SLE_ADDR_LEN] = {0x13, 0x67, 0x5c, 0x07, 0x00, 0x51}; 
-
-    osal_printk("Hybrid-C local_addr: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
-           local_addr[0], local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
-    sle_addr_t local_address;
-    local_address.type = SLE_ADDRESS_TYPE_PUBLIC;
-    memcpy_s(local_address.addr,SLE_ADDR_LEN,local_addr,SLE_ADDR_LEN);
-    sle_set_local_addr(&local_address);
-}
-
-void sle_hybridc_wait_service_found(void)
-{
-    while (g_sle_service_found == 0)
-    {
-        osal_msleep(100); 
-    }
 }
 
 int sle_hybridc_send_data(uint8_t *data, uint8_t length)
@@ -360,22 +417,27 @@ int sle_hybridc_send_data(uint8_t *data, uint8_t length)
     ret = sle_client_send_report_by_handle(data, length); 
     return ret;
 }
-//------------------hybrid-----------------//
-// #define SLE_UUID_CLIENT_TASK_PRIO 26
-// #define SLE_UUID_CLIENT_STACK_SIZE 0x2000
 
-// static void sle_uuid_client_entry(void)
-// {
-//     osal_task *task_handle = NULL;
-//     osal_kthread_lock();
-//     task_handle= osal_kthread_create((osal_kthread_handler)sle_client_init, 0, "sle_gatt_client",
-//         SLE_UUID_CLIENT_STACK_SIZE);
-//     if (task_handle != NULL) {
-//         osal_kthread_set_priority(task_handle, SLE_UUID_CLIENT_TASK_PRIO);
-//         osal_kfree(task_handle);
-//     }
-//     osal_kthread_unlock();
-// }
+void sle_hybridc_init()
+{
+    
+    uint32_t ret = sle_uuid_client_register();
+    printf("sle_uuid_client_register_errcode:%d\r\n", ret);
 
-// /* Run the app entry. */
-// app_run(sle_uuid_client_entry);
+    sle_client_ssapc_cbk_register(ssapc_notification_cbk, ssapc_indication_cbk);
+}
+
+void sle_set_hybridc_addr(void)
+{
+    
+    uint8_t local_addr[SLE_ADDR_LEN] = {0x13, 0x67, 0x5c, 0x07, 0x00, 0x51};                                            
+    printf("Hybrid-C local_addr: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
+           local_addr[0], local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
+    sle_addr_t local_address;
+
+    local_address.type = SLE_ADDRESS_TYPE_PUBLIC;
+
+    (void)memcpy_s(local_address.addr, SLE_ADDR_LEN, local_addr, SLE_ADDR_LEN);
+
+    sle_set_local_addr(&local_address);
+}

@@ -1,14 +1,3 @@
-/*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd.. 2022. All rights reserved.
- *
- * Description: SLE UUID Server module.
- */
-
-/**
- * @defgroup SLE UUID SERVER API
- * @ingroup
- * @{
- */
 #ifndef SLE_UUID_SERVER_H
 #define SLE_UUID_SERVER_H
 

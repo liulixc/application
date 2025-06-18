@@ -7,4 +7,5 @@ set(SOURCES "${SOURCES}"
     "${CMAKE_CURRENT_SOURCE_DIR}/sle_server_adv.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/sle_callbacks.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/sle_hybrid.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh.c"
     PARENT_SCOPE)

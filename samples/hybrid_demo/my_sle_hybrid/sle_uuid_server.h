@@ -24,74 +24,16 @@
 /* Property Property */
 #define SLE_UUID_TEST_PROPERTIES  (SSAP_PERMISSION_READ | SSAP_PERMISSION_WRITE)
 
+/* Operation indication */
+#define SLE_UUID_HYBRID_OPERATION_INDICATION  (SSAP_OPERATE_INDICATION_BIT_READ | SSAP_OPERATE_INDICATION_BIT_WRITE)
+
 /* Descriptor Property */
 #define SLE_UUID_TEST_DESCRIPTOR   (SSAP_PERMISSION_READ | SSAP_PERMISSION_WRITE)
 
-/**
- * @if Eng
- * @brief  SLE uuid server inir.
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li sle_ssap_server.h
- * @else
- * @brief  SLE UUID服务器初始化。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li sle_ssap_server.h
- * @endif
- */
-errcode_t sle_uuid_server_init(void);
-
-/**
- * @if Eng
- * @brief  send data to peer device by uuid on uuid server.
- * @attention  NULL
- * @param  [in]  value  send value.
- * @param  [in]  len    Length of send value。
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li sle_ssap_server.h
- * @else
- * @brief  通过uuid server 发送数据给对端。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li sle_ssap_server.h
- * @endif
- */
-errcode_t sle_uuid_server_send_report_by_uuid(const uint8_t *data, uint16_t len);
-
-/**
- * @if Eng
- * @brief  send data to peer device by handle on uuid server.
- * @attention  NULL
- * @param  [in]  value  send value.
- * @param  [in]  len    Length of send value。
- * @retval ERRCODE_SLE_SUCCESS    Excute successfully
- * @retval ERRCODE_SLE_FAIL       Execute fail
- * @par Dependency:
- * @li sle_ssap_server.h
- * @else
- * @brief  通过uuid server 发送数据给对端。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li sle_ssap_server.h
- * @endif
- */
-errcode_t sle_uuid_server_send_report_by_handle(const uint8_t *data, uint8_t len);
 
 
-errcode_t sle_hybridS_init(void);
-
+errcode_t sle_hybrids_init(void);
+int sle_hybrids_send_data(uint8_t *data,uint8_t length);
+uint8_t sle_hybrids_is_client_connected(void);
 void sle_hybrids_wait_client_connected(void);
-
-int sle_hybrids_send_data(uint8_t *data, uint8_t length);
 #endif

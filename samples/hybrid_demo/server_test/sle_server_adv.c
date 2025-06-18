@@ -1,7 +1,3 @@
-/*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd.. 2023. All rights reserved.
- * Description: sle adv config for sle uuid server.
- */
 #include "securec.h"
 #include "errcode.h"
 #include "osal_addr.h"
@@ -116,7 +112,7 @@ static int sle_set_default_announce_param(void)
     errno_t ret;
     uint8_t index;
     sle_announce_param_t param = {0};
-    unsigned char local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x03 };
+    unsigned char local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x04 };
     param.announce_mode = SLE_ANNOUNCE_MODE_CONNECTABLE_SCANABLE;
     param.announce_handle = SLE_ADV_HANDLE_DEFAULT;
     param.announce_gt_role = SLE_ANNOUNCE_ROLE_T_CAN_NEGO;

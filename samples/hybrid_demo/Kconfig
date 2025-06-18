@@ -4,7 +4,7 @@ config SAMPLE_SUPPORT_CLIENT
     default n
     depends on ENABLE_SLE_HYBRID
     help
-        This option means support BMS_SLAVE Sample.
+        This option means support Client Sample.
 
 
 config SAMPLE_SUPPORT_HYBRID
@@ -13,7 +13,7 @@ config SAMPLE_SUPPORT_HYBRID
     default n
     depends on ENABLE_SLE_HYBRID
     help
-        This option means support BMS_GATEWAY Sample.
+        This option means support hybrid Sample.
 
 config SAMPLE_SUPPORT_SERVER
     bool
@@ -21,4 +21,4 @@ config SAMPLE_SUPPORT_SERVER
     default n
     depends on ENABLE_SLE_HYBRID
     help
-        This option means support SLE UART  1 vs 8  Sample.
+        This option means support SLE Server  Sample.

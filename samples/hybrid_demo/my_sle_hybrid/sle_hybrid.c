@@ -1,138 +1,131 @@
-
-#include <stdio.h>   // ±ê×¼ÊäÈëÊä³öº¯Êı
-#include <string.h>   // ×Ö·û´®´¦Àíº¯Êı
-#include <unistd.h>   // POSIX±ê×¼º¯Êı
-#include "app_init.h"  // Ó¦ÓÃ³õÊ¼»¯Í·ÎÄ¼ş
-#include "cmsis_os2.h"  // CMSIS-RTOS2 APIÍ·ÎÄ¼ş
-#include "common_def.h"  // Í¨ÓÃ¶¨ÒåÍ·ÎÄ¼ş
-#include "soc_osal.h"  // SOC²Ù×÷ÏµÍ³³éÏó²ãÍ·ÎÄ¼ş
-#include "sle_device_discovery.h"  // SLEÉè±¸·¢ÏÖÏà¹ØÍ·ÎÄ¼ş
-#include "sle_uuid_client.h"  // SLE¿Í»§¶ËÏà¹ØÍ·ÎÄ¼ş
-#include "sle_uuid_server.h"  // SLE·şÎñ¶ËÏà¹ØÍ·ÎÄ¼ş
+#include <stdio.h>   // æ ‡å‡†è¾“å…¥è¾“å‡ºå¤´æ–‡ä»¶
+#include <string.h>   // å­—ç¬¦ä¸²æ“ä½œå¤´æ–‡ä»¶
+#include <unistd.h>   // POSIXæ ‡å‡†å¤´æ–‡ä»¶
+#include "app_init.h"  // åº”ç”¨åˆå§‹åŒ–å¤´æ–‡ä»¶
+#include "cmsis_os2.h"  // CMSIS-RTOS2 APIå¤´æ–‡ä»¶
+#include "common_def.h"  // é€šç”¨å®šä¹‰å¤´æ–‡ä»¶
+#include "soc_osal.h"  // SOCæ“ä½œç³»ç»Ÿå¤´æ–‡ä»¶
+#include "sle_device_discovery.h"  // SLEè®¾å¤‡å‘ç°å¤´æ–‡ä»¶
+#include "sle_uuid_client.h"  // SLEå®¢æˆ·ç«¯æœåŠ¡å¤´æ–‡ä»¶
+#include "sle_uuid_server.h"  // SLEæœåŠ¡å™¨æœåŠ¡å¤´æ–‡ä»¶
+#include "sle_mesh.h"
 
 /**
- * @brief ²âÊÔ»ìºÏÄ£Ê½ÏÂ¿Í»§¶Ë·¢ËÍÊı¾İ¹¦ÄÜ
- * @note µÈ´ı·¢ÏÖ·şÎñºó£¬Ã¿100ºÁÃë·¢ËÍÒ»´ÎµİÔöµÄÊı×Ö
+ * @brief æµ‹è¯•æ··åˆCæ¨¡å¼å‘é€æ•°æ®
+ * @note ç­‰å¾…å­—ç¬¦ä¸²ï¼Œæ¯100æ¯«ç§’å‘é€ä¸€æ¬¡
  */
 static void TestHybridCSend(void)
 {
-    osal_printk("Hybrid-C Send\r\n");  // ´òÓ¡¿Í»§¶Ë·¢ËÍÄ£Ê½Æô¶¯ĞÅÏ¢
+    osal_printk("Hybrid-C Send\r\n");  // æ‰“å°æ··åˆCæ¨¡å¼å‘é€æ¨¡å¼ä¿¡æ¯
 
-    // µÈ´ı¿Í»§¶Ë·¢ÏÖÔ¶³Ì·şÎñ£¬ÕâÊÇÒ»¸ö×èÈûµ÷ÓÃ
-    sle_hybridc_wait_service_found();
 
-    char data[32] = {0};  // ¶¨Òå·¢ËÍÊı¾İ»º³åÇø
-    int count = 1;  // ³õÊ¼»¯¼ÆÊıÆ÷
+    char data[32] = {0};  // å­˜å‚¨å‘é€çš„æ•°æ®
+    int count = 1;  // åˆå§‹åŒ–è®¡æ•°å™¨
     while (1)
     {
-        // ½«¼ÆÊıÆ÷×ª»»Îª×Ö·û´®
+        // å°†æ•´æ•°è½¬æ¢ä¸ºå­—ç¬¦ä¸²
         sprintf(data, "%d", count);
-        // Í¨¹ı¿Í»§¶Ë½Ó¿Ú·¢ËÍÊı¾İ
+        // é€šè¿‡æ··åˆCæ¥å£å‘é€æ•°æ®
         sle_hybridc_send_data((uint8_t *)data, strlen(data));
-        count++;  // ¼ÆÊıÆ÷µİÔö
-        osDelay(100);  // ÑÓÊ±100ºÁÃë
+        count++;  // å¢åŠ è®¡æ•°å™¨
+        osDelay(100);  // ç­‰å¾…100æ¯«ç§’
     }
 }
 
 /**
- * @brief ²âÊÔ»ìºÏÄ£Ê½ÏÂ·şÎñ¶Ë·¢ËÍÊı¾İ¹¦ÄÜ
- * @note µÈ´ı¿Í»§¶ËÁ¬½Óºó£¬Ã¿100ºÁÃë·¢ËÍÒ»´ÎµİÔöµÄÊı×Ö
+ * @brief æµ‹è¯•æ··åˆSæ¨¡å¼å‘é€æ•°æ®
+ * @note ç­‰å¾…æ··åˆæœåŠ¡å™¨è¿æ¥ï¼Œæ¯100æ¯«ç§’å‘é€ä¸€æ¬¡
  */
 static void TestHybridSSend(void)
 {
-    osal_printk("Hybrid-S Send\r\n");  // ´òÓ¡·şÎñ¶Ë·¢ËÍÄ£Ê½Æô¶¯ĞÅÏ¢
+    osal_printk("Hybrid-S Send\r\n");  // æ‰“å°æ··åˆSæ¨¡å¼å‘é€æ¨¡å¼ä¿¡æ¯
 
-    // µÈ´ı¿Í»§¶ËÁ¬½Óµ½·şÎñ¶Ë£¬ÕâÊÇÒ»¸ö×èÈûµ÷ÓÃ
+    // ç­‰å¾…æ··åˆæœåŠ¡å™¨è¿æ¥ï¼Œç„¶åå‘é€ä¸€æ¬¡æ•°æ®
     sle_hybrids_wait_client_connected();
 
-    char data[16] = {0};  // ¶¨Òå·¢ËÍÊı¾İ»º³åÇø
-    int count = 1;  // ³õÊ¼»¯¼ÆÊıÆ÷
-    errcode_t ret = 0;  // ²Ù×÷½á¹û×´Ì¬Âë
+    char data[16] = {0};  // å­˜å‚¨å‘é€çš„æ•°æ®
+    int count = 1;  // åˆå§‹åŒ–è®¡æ•°å™¨
     while (1)
     {
-        // ½«¼ÆÊıÆ÷×ª»»Îª×Ö·û´®
+        // å°†æ•´æ•°è½¬æ¢ä¸ºå­—ç¬¦ä¸²
         sprintf(data, "%d", count);
-        // Í¨¹ı·şÎñ¶Ë½Ó¿Ú·¢ËÍÊı¾İ
-        ret = sle_hybrids_send_data((uint8_t *)data, strlen(data));
-        // ¸ù¾İ·¢ËÍ½á¹û´òÓ¡²»Í¬µÄÈÕÖ¾
+        // é€šè¿‡æ··åˆSæ¥å£å‘é€æ•°æ®
+        int ret = sle_hybrids_send_data((uint8_t *)data, strlen(data));
+        // å¦‚æœå‘é€å¤±è´¥ï¼Œæ‰“å°å¤±è´¥ä¿¡æ¯ï¼Œå¦åˆ™æ‰“å°æˆåŠŸä¿¡æ¯
         if(ret != ERRCODE_SUCC)
         {
-            osal_printk("sle_hybrids_send_data FAIL\r\n");  // ·¢ËÍÊ§°Ü
+            osal_printk("sle_hybrids_send_data FAIL\r\n");  // å‘é€å¤±è´¥
         }
         else
         {
-            osal_printk("sle_hybrids_send_data SUCC\r\n");  // ·¢ËÍ³É¹¦
+            osal_printk("sle_hybrids_send_data SUCC\r\n");  // å‘é€æˆåŠŸ
         }
-        count++;  // ¼ÆÊıÆ÷µİÔö
-        osDelay(100);  // ÑÓÊ±100ºÁÃë
+        count++;  // å¢åŠ è®¡æ•°å™¨
+        osDelay(100);  // ç­‰å¾…100æ¯«ç§’
     }
 }
 
-// Íâ²¿º¯ÊıÉùÃ÷£¬ÓÃÓÚ×¢²áSLEÍ¨ÓÃ»Øµ÷º¯Êı
+static void sle_mesh_task(void)
+{
+    osal_printk("SLE Mesh Task Started\r\n");
+    
+    sle_mesh_init();
+
+    char data[32] = {0};
+    int count = 1;
+    while (1) {
+        sprintf(data, "Mesh message %d", count);
+        osal_printk("Sending: %s\r\n", data);
+        sle_mesh_send_data((uint8_t *)data, strlen(data));
+        count++;
+        osDelay(3000); // Send every 3 seconds
+    }
+}
+
+// å¤–éƒ¨å‡½æ•°ï¼Œç”¨äºæ³¨å†ŒSLEé€šç”¨å›è°ƒ
 extern errcode_t sle_register_common_cbks(void);
 
 /**
- * @brief SLE»ìºÏÄ£Ê½Ö÷ÈÎÎñº¯Êı
- * @param arg ÈÎÎñ²ÎÊı£¬Î´Ê¹ÓÃ
- * @note ÒÀ´Î³õÊ¼»¯·şÎñ¶Ë¡¢¿Í»§¶Ë£¬×¢²á»Øµ÷£¬²¢ÆôÓÃ·¢ËÍ²âÊÔ
+ * @brief SLEæ··åˆæ¨¡å¼ä¸»ä»»åŠ¡
+ * @param arg ä»»åŠ¡å‚æ•°ï¼Œæœªä½¿ç”¨
+ * @note æ­¤å‡½æ•°åˆå§‹åŒ–å®¢æˆ·ç«¯å’ŒæœåŠ¡å™¨ï¼Œæ³¨å†Œå›è°ƒï¼Œå¹¶å¯åŠ¨SLEåè®®æ ˆ
  */
 void sle_hybrid_task(char *arg)
 {
-    unused(arg);  // ºöÂÔÎ´Ê¹ÓÃµÄ²ÎÊı
-    errcode_t ret = 0;  // ²Ù×÷½á¹û×´Ì¬Âë
-    
-    // 1. ³õÊ¼»¯SLE·şÎñ¶Ë
+    unused(arg);  // é¿å…æœªä½¿ç”¨å‚æ•°çš„ç¼–è¯‘å‘Šè­¦
+    errcode_t ret = 0;  // ç”¨äºä¿å­˜å‡½æ•°è¿”å›å€¼
+
+    // 1. åˆå§‹åŒ–SLEæœåŠ¡å™¨
     osal_printk("[sle hybrid] sle hybrid-s init\r\n");
-    ret = sle_hybridS_init();
-    if(ret != ERRCODE_SUCC)
-    {
-        osal_printk("[sle hybrid] sle hybrid-s init FAIL\r\n");
-        return;  // ³õÊ¼»¯Ê§°ÜÖ±½Ó·µ»Ø
-    }
-
-    // ÉèÖÃÔ¶³Ì·şÎñÆ÷Ãû³Æ£¬ÓÃÓÚ¿Í»§¶ËÁ¬½ÓÅĞ¶Ï
-    sle_set_remote_server_name("sle_server");
+    sle_hybrids_init();
     
-    // 2. ³õÊ¼»¯SLE¿Í»§¶Ë
+    // 2. åˆå§‹åŒ–SLEå®¢æˆ·ç«¯
     osal_printk("[sle hybrid] sle hybrid-c init\r\n");
-    ret = sle_hybridC_init();
-    if(ret != ERRCODE_SUCC)
-    {
-        osal_printk("[sle hybrid] sle hybrid-c init FAIL\r\n");
-        return;  // ³õÊ¼»¯Ê§°ÜÖ±½Ó·µ»Ø
-    }
+    sle_hybridc_init();
 
-    // 3. ×¢²áSLEÍ¨ÓÃ»Øµ÷º¯Êı
-    ret = sle_register_common_cbks();
-    if(ret != ERRCODE_SUCC)
-    {
-        osal_printk("[sle hybrid] sle_register_common_cbks FAIL\r\n");
-        return;  // ×¢²áÊ§°ÜÖ±½Ó·µ»Ø
-    }
+    // 3. æ³¨å†ŒSLEé€šç”¨å›è°ƒå‡½æ•°
+    sle_register_common_cbks();
 
-    // 4. ÆôÓÃSLE¹¦ÄÜ
+    // 4. å¯ç”¨SLEåè®®æ ˆ
     ret = enable_sle();
     if (ret != 0)
     {
         osal_printk("enable_sle fail :%x\r\n", ret);
-        return;  // ÆôÓÃÊ§°ÜÖ±½Ó·µ»Ø
+        return;  // å¦‚æœå¯ç”¨å¤±è´¥ï¼Œç›´æ¥è¿”å›
     }
     osal_printk("enable_sle succ\r\n");
-    // 5. ÉèÖÃ¿Í»§¶ËµØÖ·
-    sle_set_hybridc_addr();
 
-    // 6. Ñ¡Ôñ²âÊÔÄ£Ê½£º¿Í»§¶Ë·¢ËÍ»ò·şÎñ¶Ë·¢ËÍ
-    //TestHybridCSend();  // µ±Ç°×¢ÊÍµô£¬²»Ê¹ÓÃ¿Í»§¶Ë·¢ËÍ²âÊÔ
-    TestHybridSSend();  // Ê¹ÓÃ·şÎñ¶Ë·¢ËÍ²âÊÔ
+    // 5. å¯åŠ¨Meshæµ‹è¯•ä»»åŠ¡
+    sle_mesh_task();
 }
 
-// ÈÎÎñÓÅÏÈ¼¶ºÍÕ»´óĞ¡¶¨Òå
-#define SLE_HYBRIDTASK_PRIO 24          // »ìºÏÄ£Ê½ÈÎÎñÓÅÏÈ¼¶
-#define SLE_HYBRID_STACK_SIZE 0x2000    // »ìºÏÄ£Ê½ÈÎÎñÕ»´óĞ¡(8KB)
+// ä»»åŠ¡ä¼˜å…ˆçº§å’Œå †æ ˆå¤§å°å®šä¹‰
+#define SLE_HYBRIDTASK_PRIO 24          // æ··åˆæ¨¡å¼ä»»åŠ¡ä¼˜å…ˆçº§
+#define SLE_HYBRID_STACK_SIZE 0x2000    // æ··åˆæ¨¡å¼ä»»åŠ¡å †æ ˆå¤§å°(8KB)
 
 /**
- * @brief SLE»ìºÏÄ£Ê½³ÌĞòÈë¿Úº¯Êı
- * @note ´´½¨»ìºÏÄ£Ê½Ö÷ÈÎÎñ
+ * @brief SLEæ··åˆæ¨¡å¼ä»»åŠ¡å…¥å£
+ * @note æ­¤å‡½æ•°ç”¨äºå¯åŠ¨æ··åˆæ¨¡å¼ä»»åŠ¡
  */
 static void sle_hybrid_entry(void)
 {

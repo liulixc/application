@@ -18,9 +18,15 @@
 
 #define OCTET_BIT_LEN 8
 #define UUID_LEN_2     2
+#define UUID_16BIT_LEN 2   
+#define UUID_128BIT_LEN 16 
+#define UUID_INDEX 14   
+
 #define BT_INDEX_4     4
 #define BT_INDEX_5     5
 #define BT_INDEX_0     0
+
+#define SLE_ADV_HANDLE_DEFAULT 1
 
 #define encode2byte_little(_ptr, data) \
     do { \
@@ -29,7 +35,7 @@
     } while (0)
 
 /* sle server app uuid for test */
-char g_sle_uuid_app_uuid[UUID_LEN_2] = {0x0, 0x0};
+char g_sle_uuid_app_uuid[UUID_LEN_2] = {0x12, 0x34};
 /* server notify property uuid for test */
 char g_sle_property_value[OCTET_BIT_LEN] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 /* sle connect acb handle */
@@ -40,6 +46,8 @@ uint8_t g_server_id = 0;
 uint16_t g_service_handle = 0;
 /* sle ntf property handle */
 uint16_t g_property_handle = 0;
+
+#define SLE_SERVER_LOG "[sle server]"
 
 sle_acb_state_t g_sle_hybrids_conn_state = SLE_ACB_STATE_NONE;
 
@@ -59,20 +67,30 @@ static void sle_uuid_setu2(uint16_t u2, sle_uuid_t *out)
     encode2byte_little(&out->uuid[14], u2);
 }
 
-static void ssaps_read_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_read_cb_t *read_cb_para,
-    errcode_t status)
+static void sle_uuid_print(sle_uuid_t *uuid)
 {
-    osal_printk("[uuid server] ssaps read request cbk server_id:%x, conn_id:%x, handle:%x, status:%x\r\n",
-        server_id, conn_id, read_cb_para->handle, status);
-}
-
-static void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_write_cb_t *write_cb_para,
-    errcode_t status)
-{
-    osal_printk("[uuid server] ssaps write request cbk server_id:%x, conn_id:%x, handle:%x, status:%x\r\n",
-        server_id, conn_id, write_cb_para->handle, status);
-    osal_printk("Hybrid-S recv data:%02x %02x %02x %02x",write_cb_para->value[0],write_cb_para->value[1],
-        write_cb_para->value[2],write_cb_para->value[3]);
+    if (uuid == NULL)
+    {
+        printf("%s uuid_print,uuid is null\r\n", SLE_SERVER_LOG);
+        return;
+    }
+    if (uuid->len == UUID_16BIT_LEN)
+    {
+        printf("%s uuid: %02x %02x.\n", SLE_SERVER_LOG,
+               uuid->uuid[14], uuid->uuid[15]); 
+    }
+    else if (uuid->len == UUID_128BIT_LEN)
+    {
+        printf("%s uuid: \n", SLE_SERVER_LOG); 
+        printf("%s 0x%02x 0x%02x 0x%02x \n", SLE_SERVER_LOG, uuid->uuid[0], uuid->uuid[1],
+               uuid->uuid[2], uuid->uuid[3]);
+        printf("%s 0x%02x 0x%02x 0x%02x \n", SLE_SERVER_LOG, uuid->uuid[4], uuid->uuid[5],
+               uuid->uuid[6], uuid->uuid[7]);
+        printf("%s 0x%02x 0x%02x 0x%02x \n", SLE_SERVER_LOG, uuid->uuid[8], uuid->uuid[9],
+               uuid->uuid[10], uuid->uuid[11]);
+        printf("%s 0x%02x 0x%02x 0x%02x \n", SLE_SERVER_LOG, uuid->uuid[12], uuid->uuid[13],
+               uuid->uuid[14], uuid->uuid[15]);
+    }
 }
 
 static void ssaps_mtu_changed_cbk(uint8_t server_id, uint16_t conn_id,  ssap_exchange_info_t *mtu_size,
@@ -88,21 +106,58 @@ static void ssaps_start_service_cbk(uint8_t server_id, uint16_t handle, errcode_
         server_id, handle, status);
 }
 
-static errcode_t sle_ssaps_register_cbks(void)
+
+static void ssaps_add_service_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t handle, errcode_t status)
 {
-    errcode_t ret = 0;
+    printf("%s [ssaps_add_service_cbk] server_id:%x, handle:%x, status:%x\r\n", SLE_SERVER_LOG,
+           server_id, handle, status);
+    sle_uuid_print(uuid);
+}
+
+static void ssaps_add_property_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t service_handle,
+                                   uint16_t handle, errcode_t status)
+{
+    printf("%s [ssaps_add_property_cbk] server_id:%x, service_handle:%x,handle:%x, status:%x\r\n",
+           SLE_SERVER_LOG, server_id, service_handle, handle, status);
+    sle_uuid_print(uuid);
+}
+
+static void ssaps_add_descriptor_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t service_handle,
+                                     uint16_t property_handle, errcode_t status)
+{
+    printf("%s [ssaps_add_descriptor_cbk] server_id:%x, service_handle:%x, property_handle:%x, \
+        status:%x\r\n",
+           SLE_SERVER_LOG, server_id, service_handle, property_handle, status);
+    sle_uuid_print(uuid);
+}
+
+static void ssaps_delete_all_service_cbk(uint8_t server_id, errcode_t status)
+{
+    printf("%s [ssaps_delete_all_service_cbk] server_id:%x, status:%x\r\n", SLE_SERVER_LOG,
+           server_id, status);
+}
+
+static errcode_t sle_ssaps_register_cbks(ssaps_read_request_callback ssaps_read_request_cbk,
+                                         ssaps_write_request_callback ssaps_write_request_cbk)
+{
+    errcode_t ret;
     ssaps_callbacks_t ssaps_cbk = {0};
-    ssaps_cbk.start_service_cb = ssaps_start_service_cbk;
-    ssaps_cbk.mtu_changed_cb = ssaps_mtu_changed_cbk;
-    ssaps_cbk.read_request_cb = ssaps_read_request_cbk;
-    ssaps_cbk.write_request_cb = ssaps_write_request_cbk;
-    ret = ssaps_register_callbacks(&ssaps_cbk);
-    if(ret != ERRCODE_SUCC)
+    ssaps_cbk.add_service_cb = ssaps_add_service_cbk;              
+    ssaps_cbk.add_property_cb = ssaps_add_property_cbk;            
+    ssaps_cbk.add_descriptor_cb = ssaps_add_descriptor_cbk;        
+    ssaps_cbk.start_service_cb = ssaps_start_service_cbk;          
+    ssaps_cbk.delete_all_service_cb = ssaps_delete_all_service_cbk; 
+    ssaps_cbk.mtu_changed_cb = ssaps_mtu_changed_cbk;              
+    ssaps_cbk.read_request_cb = ssaps_read_request_cbk;            
+    ssaps_cbk.write_request_cb = ssaps_write_request_cbk;          
+    ret = SsapsRegisterCallbacks(&ssaps_cbk);                    
+    if (ret != ERRCODE_SLE_SUCCESS)
     {
-        osal_printk("[sle hybridS]: sle server ssap register fail\r\n");
+        printf("%s [sle_ssaps_register_cbks] ssaps_register_callbacks fail :%x\r\n", SLE_SERVER_LOG,
+               ret);
         return ret;
     }
-    return ERRCODE_SUCC;
+    return ERRCODE_SLE_SUCCESS;
 }
 
 static errcode_t sle_uuid_server_service_add(void)
@@ -315,39 +370,41 @@ void sle_server_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
            conn_id, rssi, status);
 }
 
-static void sle_conn_register_cbks(void)
+
+static void ssaps_read_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_read_cb_t *read_cb_para,
+    errcode_t status)
 {
-    sle_connection_callbacks_t conn_cbks = {0};
-    conn_cbks.connect_state_changed_cb = sle_server_connect_state_changed_cbk;
-    conn_cbks.pair_complete_cb = sle_server_pair_complete_cbk;
-    sle_connection_register_callbacks(&conn_cbks);
+    osal_printk("[uuid server] ssaps read request cbk server_id:%x, conn_id:%x, handle:%x, status:%x\r\n",
+        server_id, conn_id, read_cb_para->handle, status);
 }
 
-/* 初始化uuid server */
-errcode_t sle_uuid_server_init(void)
+void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_write_cb_t *write_cb_para,
+                             errcode_t status)
 {
-    enable_sle();
-    sle_conn_register_cbks();
-    sle_ssaps_register_cbks();
-    sle_uuid_server_add();
-    sle_uuid_server_adv_init();
-    osal_printk("[uuid server] init ok\r\n");
-    return ERRCODE_SLE_SUCCESS;
+    (void)server_id;
+    (void)conn_id;
+    (void)status;
+    write_cb_para->value[write_cb_para->length - 1] = '\0';
+    printf("[ssaps_write_request_cbk] client_send_data: %s\r\n\r\n", write_cb_para->value);
 
-    
 }
+
+
 
 //****************hybrid******************//
-errcode_t sle_hybridS_init(void)
+errcode_t sle_hybrids_init()
 {
-    errcode_t ret = 0;
-    ret = sle_ssaps_register_cbks();
-    if(ret != ERRCODE_SUCC)
+    errcode_t ret;
+
+    ret = sle_ssaps_register_cbks(ssaps_read_request_cbk, ssaps_write_request_cbk);
+    if (ret != ERRCODE_SLE_SUCCESS)
     {
+        printf("%s [sle_hybrids_init] sle_ssaps_register_cbks fail :%x\r\n", SLE_SERVER_LOG, ret);
         return ret;
     }
-    osal_printk("[sle_hybrid] : sle_hybridS_init SUCC\r\n");
-    return ERRCODE_SUCC;
+
+    printf("%s [sle_hybrids_init] init ok\r\n", SLE_SERVER_LOG);
+    return ERRCODE_SLE_SUCCESS;
 }
 
 void sle_server_sle_enable_cbk(errcode_t status)
@@ -370,6 +427,25 @@ void sle_server_sle_enable_cbk(errcode_t status)
 
 }
 
+int sle_hybrids_send_data(uint8_t *data, uint8_t length)
+{
+    int ret;
+    ret = sle_uuid_server_send_report_by_handle(data, length);
+    return ret;
+}
+
+uint8_t sle_hybrids_is_client_connected(void)
+{
+    if (g_sle_hybrids_conn_state == SLE_ACB_STATE_CONNECTED)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+}
+
 void sle_server_sle_disable_cbk(errcode_t status)
 {
     unused(status);
@@ -384,28 +460,4 @@ void sle_hybrids_wait_client_connected(void)
     }
 }
 
-int sle_hybrids_send_data(uint8_t *data, uint8_t length)
-{
-    int ret;
-    ret = sle_uuid_server_send_report_by_handle(data, length);
-    return ret;
-}
-//---------------------------------------------------//
-// #define SLE_UUID_SERVER_TASK_PRIO 26
-// #define SLE_UUID_SERVER_STACK_SIZE 0x2000
 
-// static void sle_uuid_server_entry(void)
-// {
-//     osal_task *task_handle = NULL;
-//     osal_kthread_lock();
-//     task_handle= osal_kthread_create((osal_kthread_handler)sle_uuid_server_init, 0, "sle_uuid_server",
-//         SLE_UUID_SERVER_STACK_SIZE);
-//     if (task_handle != NULL) {
-//         osal_kthread_set_priority(task_handle, SLE_UUID_SERVER_TASK_PRIO);
-//         osal_kfree(task_handle);
-//     }
-//     osal_kthread_unlock();
-// }
-
-// /* Run the app entry. */
-// app_run(sle_uuid_server_entry);

@@ -1,15 +1,3 @@
-/*
- * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd.. 2023. All rights reserved.
- *
- * Description: SLE ADV Config.
- */
-
-/**
- * @defgroup bluetooth_sle_adv API
- * @ingroup
- * @{
- */
-
 #ifndef SLE_SERVER_ADV_H
 #define SLE_SERVER_ADV_H
 
