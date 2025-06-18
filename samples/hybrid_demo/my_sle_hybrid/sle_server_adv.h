@@ -1,3 +1,4 @@
+
 #ifndef SLE_SERVER_ADV_H
 #define SLE_SERVER_ADV_H
 
@@ -61,6 +62,5 @@ typedef enum {
  * @endif
  */
 errcode_t sle_uuid_server_adv_init(void);
-errcode_t sle_server_set_and_update_mesh_adv_data(const uint8_t *data, uint16_t len);
 // errcode_t sle_announce_register_cbks(void);
 #endif

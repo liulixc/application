@@ -1,131 +1,119 @@
-#include <stdio.h>   // 标准输入输出头文件
-#include <string.h>   // 字符串操作头文件
-#include <unistd.h>   // POSIX标准头文件
-#include "app_init.h"  // 应用初始化头文件
-#include "cmsis_os2.h"  // CMSIS-RTOS2 API头文件
-#include "common_def.h"  // 通用定义头文件
-#include "soc_osal.h"  // SOC操作系统头文件
-#include "sle_device_discovery.h"  // SLE设备发现头文件
-#include "sle_uuid_client.h"  // SLE客户端服务头文件
-#include "sle_uuid_server.h"  // SLE服务器服务头文件
-#include "sle_mesh.h"
+
+#include <stdio.h>   // ��׼�����������
+#include <string.h>   // �ַ�����������
+#include <unistd.h>   // POSIX��׼����
+#include "app_init.h"  // Ӧ�ó�ʼ��ͷ�ļ�
+#include "cmsis_os2.h"  // CMSIS-RTOS2 APIͷ�ļ�
+#include "common_def.h"  // ͨ�ö���ͷ�ļ�
+#include "soc_osal.h"  // SOC����ϵͳ�����ͷ�ļ�
+#include "sle_device_discovery.h"  // SLE�豸�������ͷ�ļ�
+#include "sle_uuid_client.h"  // SLE�ͻ������ͷ�ļ�
+#include "sle_uuid_server.h"  // SLE��������ͷ�ļ�
 
 /**
- * @brief 测试混合C模式发送数据
- * @note 等待字符串，每100毫秒发送一次
+ * @brief ���Ի��ģʽ�¿ͻ��˷������ݹ���
+ * @note �ȴ����ַ����ÿ100���뷢��һ�ε���������
  */
 static void TestHybridCSend(void)
 {
-    osal_printk("Hybrid-C Send\r\n");  // 打印混合C模式发送模式信息
+    osal_printk("Hybrid-C Send\r\n");  // ��ӡ�ͻ��˷���ģʽ������Ϣ
 
 
-    char data[32] = {0};  // 存储发送的数据
-    int count = 1;  // 初始化计数器
+    char data[32] = {0};  // ���巢�����ݻ�����
+    int count = 1;  // ��ʼ��������
     while (1)
     {
-        // 将整数转换为字符串
+        // ��������ת��Ϊ�ַ���
         sprintf(data, "%d", count);
-        // 通过混合C接口发送数据
+        // ͨ���ͻ��˽ӿڷ�������
         sle_hybridc_send_data((uint8_t *)data, strlen(data));
-        count++;  // 增加计数器
-        osDelay(100);  // 等待100毫秒
+        count++;  // ����������
+        osDelay(100);  // ��ʱ100����
     }
 }
 
 /**
- * @brief 测试混合S模式发送数据
- * @note 等待混合服务器连接，每100毫秒发送一次
+ * @brief ���Ի��ģʽ�·���˷������ݹ���
+ * @note �ȴ��ͻ������Ӻ�ÿ100���뷢��һ�ε���������
  */
 static void TestHybridSSend(void)
 {
-    osal_printk("Hybrid-S Send\r\n");  // 打印混合S模式发送模式信息
+    osal_printk("Hybrid-S Send\r\n");  // ��ӡ����˷���ģʽ������Ϣ
 
-    // 等待混合服务器连接，然后发送一次数据
+    // �ȴ��ͻ������ӵ�����ˣ�����һ����������
     sle_hybrids_wait_client_connected();
 
-    char data[16] = {0};  // 存储发送的数据
-    int count = 1;  // 初始化计数器
+    char data[16] = {0};  // ���巢�����ݻ�����
+    int count = 1;  // ��ʼ��������
     while (1)
     {
-        // 将整数转换为字符串
+        // ��������ת��Ϊ�ַ���
         sprintf(data, "%d", count);
-        // 通过混合S接口发送数据
+        // ͨ������˽ӿڷ�������
         int ret = sle_hybrids_send_data((uint8_t *)data, strlen(data));
-        // 如果发送失败，打印失败信息，否则打印成功信息
+        // ���ݷ��ͽ����ӡ��ͬ����־
         if(ret != ERRCODE_SUCC)
         {
-            osal_printk("sle_hybrids_send_data FAIL\r\n");  // 发送失败
+            osal_printk("sle_hybrids_send_data FAIL\r\n");  // ����ʧ��
         }
         else
         {
-            osal_printk("sle_hybrids_send_data SUCC\r\n");  // 发送成功
+            osal_printk("sle_hybrids_send_data SUCC\r\n");  // ���ͳɹ�
         }
-        count++;  // 增加计数器
-        osDelay(100);  // 等待100毫秒
+        count++;  // ����������
+        osDelay(100);  // ��ʱ100����
     }
 }
 
-static void sle_mesh_task(void)
-{
-    osal_printk("SLE Mesh Task Started\r\n");
-    
-    sle_mesh_init();
-
-    char data[32] = {0};
-    int count = 1;
-    while (1) {
-        sprintf(data, "Mesh message %d", count);
-        osal_printk("Sending: %s\r\n", data);
-        sle_mesh_send_data((uint8_t *)data, strlen(data));
-        count++;
-        osDelay(3000); // Send every 3 seconds
-    }
-}
-
-// 外部函数，用于注册SLE通用回调
+// �ⲿ��������������ע��SLEͨ�ûص�����
 extern errcode_t sle_register_common_cbks(void);
 
 /**
- * @brief SLE混合模式主任务
- * @param arg 任务参数，未使用
- * @note 此函数初始化客户端和服务器，注册回调，并启动SLE协议栈
+ * @brief SLE���ģʽ��������
+ * @param arg ���������δʹ��
+ * @note ���γ�ʼ������ˡ��ͻ��ˣ�ע��ص��������÷��Ͳ���
  */
 void sle_hybrid_task(char *arg)
 {
-    unused(arg);  // 避免未使用参数的编译告警
-    errcode_t ret = 0;  // 用于保存函数返回值
-
-    // 1. 初始化SLE服务器
+    unused(arg);  // ����δʹ�õĲ���
+    errcode_t ret = 0;  // �������״̬��
+    
+    // 1. ��ʼ��SLE�����
     osal_printk("[sle hybrid] sle hybrid-s init\r\n");
     sle_hybrids_init();
+    // ����Զ�̷��������ƣ����ڿͻ��������ж�
+    sle_set_server_name("sle_server");
     
-    // 2. 初始化SLE客户端
+    // 2. ��ʼ��SLE�ͻ���
     osal_printk("[sle hybrid] sle hybrid-c init\r\n");
     sle_hybridc_init();
 
-    // 3. 注册SLE通用回调函数
+    // 3. ע��SLEͨ�ûص�����
     sle_register_common_cbks();
 
-    // 4. 启用SLE协议栈
+    // 4. ����SLE����
     ret = enable_sle();
     if (ret != 0)
     {
         osal_printk("enable_sle fail :%x\r\n", ret);
-        return;  // 如果启用失败，直接返回
+        return;  // ����ʧ��ֱ�ӷ���
     }
     osal_printk("enable_sle succ\r\n");
+    // 5. ���ÿͻ��˵�ַ
+    sle_set_hybridc_addr();
 
-    // 5. 启动Mesh测试任务
-    sle_mesh_task();
+    // 6. ѡ�����ģʽ���ͻ��˷��ͻ����˷���
+    // TestHybridCSend();  // ��ǰע�͵�����ʹ�ÿͻ��˷��Ͳ���
+    TestHybridSSend();  // ʹ�÷���˷��Ͳ���
 }
 
-// 任务优先级和堆栈大小定义
-#define SLE_HYBRIDTASK_PRIO 24          // 混合模式任务优先级
-#define SLE_HYBRID_STACK_SIZE 0x2000    // 混合模式任务堆栈大小(8KB)
+// �������ȼ���ջ��С����
+#define SLE_HYBRIDTASK_PRIO 24          // ���ģʽ�������ȼ�
+#define SLE_HYBRID_STACK_SIZE 0x2000    // ���ģʽ����ջ��С(8KB)
 
 /**
- * @brief SLE混合模式任务入口
- * @note 此函数用于启动混合模式任务
+ * @brief SLE���ģʽ������ں���
+ * @note �������ģʽ������
  */
 static void sle_hybrid_entry(void)
 {

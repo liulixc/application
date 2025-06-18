@@ -11,7 +11,6 @@
 #include "sle_connection_manager.h"
 #include "sle_ssap_client.h"
 #include "sle_uuid_client.h"
-#include "sle_mesh.h"
 
 #undef THIS_FILE_ID
 #define THIS_FILE_ID BTH_GLE_SAMPLE_UUID_CLIENT//这是干嘛的，没看懂一点ty
@@ -111,24 +110,25 @@ void sle_client_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_
         return;
     }
 
-    uint8_t *data = seek_result_data->data;
-    uint16_t data_len = seek_result_data->data_len;
-    uint16_t offset = 0;
+    if (strstr((const char *)seek_result_data->data, g_sle_server_name) != NULL)
+    {
+        
+        osal_printk("%s [sle_client_seek_result_cbk] target found, addr: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
+                    SLE_CLIENT_LOG,
+                    seek_result_data->addr.addr[0], seek_result_data->addr.addr[1],
+                    seek_result_data->addr.addr[2], seek_result_data->addr.addr[3],
+                    seek_result_data->addr.addr[4], seek_result_data->addr.addr[5]);
 
-    while (offset < data_len) {
-        uint8_t field_len = data[offset];
-        uint8_t field_type = data[offset + 1];
+        memcpy_s(&g_sle_remote_server_addr[g_num_remote_server_addr], sizeof(sle_addr_t),
+                 &seek_result_data->addr, sizeof(sle_addr_t));
+        g_num_remote_server_addr++; 
 
-        if (field_len == 0) {
-            break;
-        }
-
-        if (field_type == SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA) {
-            // Pass manufacturer data (type + company_id + payload) to mesh processor
-            sle_mesh_process_adv_packet(&seek_result_data->addr, &data[offset + 1], field_len);
-        }
-        offset += (field_len + 1);
+        sle_connect_remote_device(&seek_result_data->addr);
     }
+    
+    
+    osal_printk("seek_result_info_cbk %s\r\n", seek_result_data->data);
+    
 }
 
 // void sle_sample_seek_cbk_register(void)
