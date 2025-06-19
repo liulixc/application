@@ -1,4 +1,3 @@
-
 #include "string.h"
 #include "soc_osal.h"
 #include "sle_errcode.h"
@@ -12,12 +11,12 @@
 #include "sle_server_adv.h"
 #include "sle_uuid_server.h"
 
-// È«¾Ö»Øµ÷½á¹¹Ìå¶¨Òå£¬ÓÃÓÚ´æ´¢Éè±¸·¢ÏÖ¡¢¹ã²¥ºÍÁ¬½ÓÏà¹ØµÄ»Øµ÷º¯Êı
-sle_announce_seek_callbacks_t g_sle_seek_cbk = {0};  // Éè±¸·¢ÏÖºÍ¹ã²¥»Øµ÷½á¹¹Ìå
-sle_connection_callbacks_t g_sle_connect_cbk = {0};  // Á¬½Ó¹ÜÀí»Øµ÷½á¹¹Ìå
+// å…¨å±€å›è°ƒç»“æ„ä½“å®šä¹‰ï¼Œç”¨äºå­˜å‚¨è®¾å¤‡å‘ç°ã€å¹¿æ’­å’Œè¿æ¥ç›¸å…³çš„å›è°ƒå‡½æ•°
+sle_announce_seek_callbacks_t g_sle_seek_cbk = {0};  // è®¾å¤‡å‘ç°å’Œå¹¿æ’­å›è°ƒç»“æ„ä½“
+sle_connection_callbacks_t g_sle_connect_cbk = {0};  // è¿æ¥ç®¡ç†å›è°ƒç»“æ„ä½“
 
-// Íâ²¿º¯ÊıÉùÃ÷£¬ÕâĞ©º¯Êı·Ö±ğÔÚ¿Í»§¶ËºÍ·şÎñ¶ËÄ£¿éÖĞÊµÏÖ
-// ·şÎñ¶ËÏà¹Ø»Øµ÷º¯Êı
+// å¤–éƒ¨å‡½æ•°å£°æ˜ï¼Œè¿™äº›å‡½æ•°åˆ†åˆ«åœ¨å®¢æˆ·ç«¯å’ŒæœåŠ¡ç«¯æ¨¡å—ä¸­å®ç°
+// æœåŠ¡ç«¯å›è°ƒå‡½æ•°
 extern void sle_server_sle_enable_cbk(errcode_t status);
 extern void sle_server_sle_disable_cbk(errcode_t status);
 extern void sle_client_sle_disable_cbk(errcode_t status);
@@ -25,15 +24,15 @@ extern void sle_client_sle_disable_cbk(errcode_t status);
 extern void sle_server_announce_enable_cbk(uint32_t announce_id, errcode_t status);
 extern void sle_server_announce_disable_cbk(uint32_t announce_id, errcode_t status);
 extern void sle_server_announce_terminal_cbk(uint32_t announce_id);
-// ¿Í»§¶ËÏà¹Ø»Øµ÷º¯Êı
+// å®¢æˆ·ç«¯å›è°ƒå‡½æ•°
 extern void sle_client_sample_seek_enable_cbk(errcode_t status);
 extern void sle_client_sample_seek_disable_cbk(errcode_t status);
 extern void sle_client_sample_seek_result_info_cbk(sle_seek_result_info_t *seek_result_data);
 
 /**
- * @brief SLEÊ¹ÄÜ»Øµ÷º¯Êı
- * @param status ²Ù×÷½á¹û×´Ì¬Âë
- * @note Í¬Ê±´¥·¢·şÎñ¶ËºÍ¿Í»§¶ËµÄSLEÊ¹ÄÜ»Øµ÷£¬ÊµÏÖ»ìºÏÄ£Ê½ÏÂµÄÍ¬²½³õÊ¼»¯
+ * @brief SLEä½¿èƒ½å›è°ƒå‡½æ•°
+ * @param status æ“ä½œè¿”å›çŠ¶æ€ç 
+ * @note åŒæ—¶å¤„ç†æœåŠ¡ç«¯å’Œå®¢æˆ·ç«¯çš„SLEä½¿èƒ½å›è°ƒï¼Œå®ç°æ··åˆæ¨¡å¼ä¸‹çš„åŒæ­¥åˆå§‹åŒ–
  */
 static void sle_enable_cbk(errcode_t status)
 {
@@ -42,9 +41,9 @@ static void sle_enable_cbk(errcode_t status)
 }
 
 /**
- * @brief SLE½ûÓÃ»Øµ÷º¯Êı
- * @param status ²Ù×÷½á¹û×´Ì¬Âë
- * @note Í¬Ê±´¥·¢·şÎñ¶ËºÍ¿Í»§¶ËµÄSLE½ûÓÃ»Øµ÷£¬ÊµÏÖ»ìºÏÄ£Ê½ÏÂµÄÍ¬²½¹Ø±Õ
+ * @brief SLEç¦ç”¨å›è°ƒå‡½æ•°
+ * @param status æ“ä½œè¿”å›çŠ¶æ€ç 
+ * @note åŒæ—¶å¤„ç†æœåŠ¡ç«¯å’Œå®¢æˆ·ç«¯çš„SLEç¦ç”¨å›è°ƒï¼Œå®ç°æ··åˆæ¨¡å¼ä¸‹çš„åŒæ­¥å…³é—­
  */
 static void sle_disable_cbk(errcode_t status)
 {
@@ -53,23 +52,23 @@ static void sle_disable_cbk(errcode_t status)
 }
 
 /**
- * @brief ×¢²áÉè±¸·¢ÏÖºÍ¹ã²¥Ïà¹ØµÄ»Øµ÷º¯Êı
- * @return ²Ù×÷½á¹û×´Ì¬Âë
- * @note Í¬Ê±×¢²á·şÎñ¶Ë(¹ã²¥)ºÍ¿Í»§¶Ë(É¨Ãè)µÄËùÓĞ»Øµ÷º¯Êıµ½Ò»¸öÈ«¾Ö½á¹¹ÌåÖĞ
+ * @brief æ³¨å†Œè®¾å¤‡å‘ç°å’Œå¹¿æ’­ç›¸å…³çš„å›è°ƒå‡½æ•°
+ * @return æ“ä½œè¿”å›çŠ¶æ€ç 
+ * @note åŒæ—¶æ³¨å†ŒæœåŠ¡ç«¯(å¹¿æ’­)å’Œå®¢æˆ·ç«¯(æ‰«æ)ä¸¤ç±»å›è°ƒå‡½æ•°åˆ°ä¸€ä¸ªå…¨å±€ç»“æ„ä½“ä¸­
  */
 static errcode_t sle_announce_seek_register_cbks(void)
 {
     errcode_t ret;
-    // ×¢²áSLE»ù´¡»Øµ÷
+    // æ³¨å†ŒSLEæ€»ä½“å›è°ƒ
     g_sle_seek_cbk.sle_enable_cb = sle_enable_cbk;
     g_sle_seek_cbk.sle_disable_cb = sle_disable_cbk;
 
-    // ×¢²á·şÎñ¶Ë¹ã²¥Ïà¹Ø»Øµ÷
+    // æ³¨å†ŒæœåŠ¡ç«¯å¹¿æ’­ç›¸å…³å›è°ƒ
     g_sle_seek_cbk.announce_enable_cb = sle_server_announce_enable_cbk;
     g_sle_seek_cbk.announce_disable_cb = sle_server_announce_disable_cbk;
     g_sle_seek_cbk.announce_terminal_cb = sle_server_announce_terminal_cbk;
 
-    // ×¢²á¿Í»§¶ËÉ¨ÃèÏà¹Ø»Øµ÷
+    // æ³¨å†Œå®¢æˆ·ç«¯æ‰«æç›¸å…³å›è°ƒ
     g_sle_seek_cbk.seek_enable_cb = sle_client_sample_seek_enable_cbk;
     g_sle_seek_cbk.seek_result_cb = sle_client_sample_seek_result_info_cbk;
     g_sle_seek_cbk.seek_disable_cb = sle_client_sample_seek_disable_cbk;
@@ -78,16 +77,16 @@ static errcode_t sle_announce_seek_register_cbks(void)
     return ret; 
 }
 
-// Íâ²¿º¯ÊıÉùÃ÷£¬ÓÃÓÚÁ¬½Ó¹ÜÀíÏà¹Ø»Øµ÷
-// ·şÎñ¶ËÁ¬½ÓÏà¹Ø»Øµ÷
+// å¤–éƒ¨å‡½æ•°å£°æ˜ï¼Œå¤„ç†è¿æ¥ç®¡ç†ç›¸å…³å›è°ƒ
+// æœåŠ¡ç«¯è¿æ¥ç›¸å…³å›è°ƒ
 extern void sle_server_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
 
-// ¿Í»§¶ËÁ¬½ÓÏà¹Ø»Øµ÷
+// å®¢æˆ·ç«¯è¿æ¥ç›¸å…³å›è°ƒ
 extern void sle_client_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
 sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason);
 
-// Á¬½Ó²ÎÊı¸üĞÂºÍÆäËû·şÎñ¶Ë»Øµ÷
+// è¿æ¥å‚æ•°æ›´æ–°å‡½æ•°ï¼ŒæœåŠ¡ç«¯å›è°ƒ
 extern void sle_server_connect_param_update_req_cbk(uint16_t conn_id, errcode_t status, const sle_connection_param_update_req_t *param);
 extern void sle_server_connect_param_update_cbk(uint16_t conn_id, errcode_t status,const sle_connection_param_update_evt_t *param);
 extern void sle_server_auth_complete_cbk(uint16_t conn_id, const sle_addr_type_t *addr, errcode_t status, const sle_auth_info_evt_t *evt);
@@ -96,13 +95,13 @@ extern void sle_server_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t st
 
 
 /**
- * @brief Á¬½Ó×´Ì¬±ä»¯»Øµ÷º¯Êı
- * @param conn_id Á¬½ÓID
- * @param addr Éè±¸µØÖ·
- * @param conn_state Á¬½Ó×´Ì¬
- * @param pair_state Åä¶Ô×´Ì¬
- * @param disc_reason ¶Ï¿ªÔ­Òò
- * @note Í¨¹ı±È½ÏMACµØÖ·ÅĞ¶ÏÊÇ·şÎñ¶Ë»¹ÊÇ¿Í»§¶ËµÄÁ¬½Ó£¬²¢µ÷ÓÃ¶ÔÓ¦µÄ»Øµ÷º¯Êı
+ * @brief è¿æ¥çŠ¶æ€å˜åŒ–å›è°ƒå‡½æ•°
+ * @param conn_id è¿æ¥ID
+ * @param addr è®¾å¤‡åœ°å€
+ * @param conn_state è¿æ¥çŠ¶æ€
+ * @param pair_state é…å¯¹çŠ¶æ€
+ * @param disc_reason æ–­å¼€åŸå› 
+ * @note é€šè¿‡æ¯”è¾ƒMACåœ°å€åˆ¤æ–­æ˜¯æœåŠ¡ç«¯è¿˜æ˜¯å®¢æˆ·ç«¯çš„è¿æ¥ï¼Œå¹¶è°ƒç”¨å¯¹åº”çš„å›è°ƒå‡½æ•°
  */
 static void connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
     sle_acb_state_t conn_state, sle_pair_state_t pair_state, sle_disc_reason_t disc_reason)
@@ -111,7 +110,7 @@ static void connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
            addr->addr[0], addr->addr[1], addr->addr[2], addr->addr[3], addr->addr[4], addr->addr[5]);
 
     uint8_t remote_server_addr_match = 0;
-    // »ñÈ¡Ô¶³Ì·şÎñÆ÷µØÖ·£¬ÓÃÓÚÅĞ¶ÏÁ¬½ÓÀàĞÍ
+    // è·å–è¿œç¨‹æœåŠ¡å™¨åœ°å€å¹¶è¿›è¡Œåˆ¤æ–­è¿æ¥ç±»å‹
     sle_addr_t *remote_server_addr = sle_get_remote_server_addr();
     for (uint8_t i = 0; i < sle_get_num_remote_server_addr(); i++)
     {
@@ -136,40 +135,40 @@ static void connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *addr,
 
 
 /**
- * @brief ×¢²áÁ¬½Ó¹ÜÀíÏà¹ØµÄ»Øµ÷º¯Êı
- * @return ²Ù×÷½á¹û×´Ì¬Âë
- * @note ½«ËùÓĞÁ¬½Ó¹ÜÀíÏà¹ØµÄ»Øµ÷º¯Êı×¢²áµ½È«¾Ö½á¹¹ÌåÖĞ
+ * @brief æ³¨å†Œè¿æ¥ç®¡ç†ç›¸å…³çš„å›è°ƒå‡½æ•°
+ * @return æ“ä½œè¿”å›çŠ¶æ€ç 
+ * @note å°†æ‰€æœ‰è¿æ¥ç®¡ç†ç›¸å…³çš„å›è°ƒå‡½æ•°æ³¨å†Œåˆ°å…¨å±€ç»“æ„ä½“ä¸­
  */
 static errcode_t sle_conn_register_cbks(void)
 {
     errcode_t ret;
-    // ×¢²áÁ¬½Ó×´Ì¬±ä»¯»Øµ÷£¬ÕâÊÇÖÇÄÜ·Ö·¢µ½·şÎñ¶Ë»ò¿Í»§¶ËµÄÍ³Ò»Èë¿Ú
+    // æ³¨å†Œè¿æ¥çŠ¶æ€å˜åŒ–å›è°ƒï¼Œæ ¹æ®åœ°å€åˆ†å‘åˆ°æœåŠ¡ç«¯æˆ–å®¢æˆ·ç«¯çš„ç»Ÿä¸€å¤„ç†
     g_sle_connect_cbk.connect_state_changed_cb = connect_state_changed_cbk;
 
-    // ×¢²áÁ¬½Ó²ÎÊı¸üĞÂÏà¹Ø»Øµ÷
+    // æ³¨å†Œè¿æ¥å‚æ•°æ›´æ–°ç›¸å…³å›è°ƒ
     g_sle_connect_cbk.connect_param_update_cb = sle_server_connect_param_update_cbk;
     g_sle_connect_cbk.connect_param_update_req_cb = sle_server_connect_param_update_req_cbk;
-    g_sle_connect_cbk.auth_complete_cb = sle_server_auth_complete_cbk; // µ±Ç°Î´Ê¹ÓÃÈÏÖ¤Íê³É»Øµ÷
+    g_sle_connect_cbk.auth_complete_cb = sle_server_auth_complete_cbk; // å½“å‰æœªä½¿ç”¨è®¤è¯å®Œæˆå›è°ƒ
     
-    // ×¢²áÅä¶ÔÍê³ÉºÍĞÅºÅÇ¿¶È»Øµ÷
+    // æ³¨å†Œé…å¯¹å®Œæˆå’Œä¿¡å·å¼ºåº¦å›è°ƒ
     g_sle_connect_cbk.pair_complete_cb = sle_server_pair_complete_cbk;
     g_sle_connect_cbk.read_rssi_cb = sle_server_read_rssi_cbk;
 
-    // ÏòSLEĞ­ÒéÕ»×¢²áÁ¬½Ó»Øµ÷½á¹¹Ìå
+    // å‘SLEåè®®æ ˆæ³¨å†Œè¿æ¥å›è°ƒç»“æ„ä½“
     ret = sle_connection_register_callbacks(&g_sle_connect_cbk);
     return ret;
 }
 
 /**
- * @brief ×¢²áËùÓĞSLEÍ¨ÓÃ»Øµ÷º¯Êı
- * @return ²Ù×÷½á¹û×´Ì¬Âë
- * @note ÕâÊÇ»ìºÏÄ£Ê½ÖĞ±»Íâ²¿µ÷ÓÃµÄÖ÷Òª½Ó¿Úº¯Êı£¬¸ºÔğ×¢²áËùÓĞSLEĞ­ÒéĞèÒªµÄ»Øµ÷º¯Êı
+ * @brief æ³¨å†Œæ‰€æœ‰SLEé€šç”¨å›è°ƒå‡½æ•°
+ * @return æ“ä½œè¿”å›çŠ¶æ€ç 
+ * @note æ··åˆæ¨¡å¼ä¸­è¢«å¤–éƒ¨è°ƒç”¨çš„ä¸»è¦æ¥å£å‡½æ•°ï¼Œç”¨äºæ³¨å†Œæ‰€æœ‰SLEåè®®éœ€è¦çš„å›è°ƒå‡½æ•°
  */
 errcode_t sle_register_common_cbks(void)
 {
     errcode_t ret;
 
-    // ×¢²áÉè±¸·¢ÏÖºÍ¹ã²¥Ïà¹Ø»Øµ÷
+    // æ³¨å†Œè®¾å¤‡å‘ç°å’Œå¹¿æ’­ç›¸å…³å›è°ƒ
     ret = sle_announce_seek_register_cbks();
     if(ret != ERRCODE_SUCC)
     {
@@ -177,7 +176,7 @@ errcode_t sle_register_common_cbks(void)
         return ret;
     }
 
-    // ×¢²áÁ¬½Ó¹ÜÀíÏà¹Ø»Øµ÷
+    // æ³¨å†Œè¿æ¥ç®¡ç†ç›¸å…³å›è°ƒ
     ret = sle_conn_register_cbks();
     if(ret != ERRCODE_SUCC)
     {

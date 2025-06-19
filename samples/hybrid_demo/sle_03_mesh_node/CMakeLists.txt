@@ -1,0 +1,10 @@
+set(SOURCES "${SOURCES}" PARENT_SCOPE)
+set(PUBLIC_HEADER "${PUBLIC_HEADER}" "${CMAKE_CURRENT_SOURCE_DIR}" PARENT_SCOPE)
+
+set(SOURCES "${SOURCES}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh_adv.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh_callbacks.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh_client.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh_node.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sle_mesh_server.c"
+    PARENT_SCOPE)

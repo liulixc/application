@@ -1,38 +1,18 @@
-
-#ifndef SLE_SERVER_ADV_H
-#define SLE_SERVER_ADV_H
-
-
-#define SLE_ADV_HANDLE_DEFAULT                    1
-/**
- * @brief SLE 广播普通数据结构。
- * @endif
- */
-typedef struct sle_adv_common_value {
-    uint8_t type;
-    uint8_t length;
-    uint8_t value;
-} le_adv_common_t;
-
-
+#ifndef SLE_ADV_CONST_H
+#define SLE_ADV_CONST_H
 
 /**
- * @brief SLE 广播信道映射。
- * @endif
+ * @brief SLE 广播信道映射
  */
-typedef enum sle_adv_channel {
+typedef enum {
     SLE_ADV_CHANNEL_MAP_77                 = 0x01,
     SLE_ADV_CHANNEL_MAP_78                 = 0x02,
     SLE_ADV_CHANNEL_MAP_79                 = 0x04,
     SLE_ADV_CHANNEL_MAP_DEFAULT            = 0x07
-} sle_adv_channel_map_t;
+} sle_adv_channel_map;
 
 /**
- * @if Eng
- * @brief Definitaion of SLE ADV Data Type.
- * @else
  * @brief SLE 广播数据类型
- * @endif
  */
 typedef enum {
     SLE_ADV_DATA_TYPE_DISCOVERY_LEVEL                              = 0x01,   /*!< 发现等级 */
@@ -53,15 +33,4 @@ typedef enum {
     SLE_ADV_DATA_TYPE_MANUFACTURER_SPECIFIC_DATA                   = 0xFF    /*!< 厂商自定义信息 */
 } sle_adv_data_type;
 
-
-/**
- * @brief  sle广播数据配置。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li NULL
- * @endif
- */
-errcode_t sle_uuid_server_adv_init(void);
-#endif
+#endif 

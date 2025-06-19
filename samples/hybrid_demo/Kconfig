@@ -22,3 +22,11 @@ config SAMPLE_SUPPORT_SERVER
     depends on ENABLE_SLE_HYBRID
     help
         This option means support SLE Server  Sample.
+
+config SAMPLE_SUPPORT_MESH
+    bool
+    prompt "Support mesh."
+    default n
+    depends on ENABLE_SLE_HYBRID
+    help
+        This option means support mesh Sample.

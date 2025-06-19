@@ -188,20 +188,11 @@ void sle_enable_cbk(errcode_t status)
     osal_printk("sle enable status:%02x\r\n", status);
 }
 
-// void sle_announce_register_cbks(void)
-// {
-//     sle_announce_seek_callbacks_t seek_cbks = {0};
-//     seek_cbks.announce_enable_cb = sle_server_announce_enable_cbk;
-//     seek_cbks.announce_disable_cb = sle_server_announce_disable_cbk;
-//     seek_cbks.announce_terminal_cb = sle_server_announce_terminal_cbk;
-//     seek_cbks.sle_enable_cb = sle_enable_cbk;
-//     sle_announce_seek_register_callbacks(&seek_cbks);
-// }
+
 
 errcode_t sle_uuid_server_adv_init(void)
 {
     osal_printk("sle_uuid_server_adv_init in\r\n");
-    //sle_announce_register_cbks();
     sle_set_default_announce_param();
     sle_set_default_announce_data();
     sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
