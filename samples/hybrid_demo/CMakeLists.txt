@@ -1,5 +1,5 @@
-if(DEFINED CONFIG_SAMPLE_SUPPORT_CLIENT)
-    add_subdirectory_if_exist(client_test)
+if(DEFINED CONFIG_SAMPLE_SUPPORT_GATEWAY)
+    add_subdirectory_if_exist(gateway)
 endif()
 
 if(DEFINED CONFIG_SAMPLE_SUPPORT_SERVER)

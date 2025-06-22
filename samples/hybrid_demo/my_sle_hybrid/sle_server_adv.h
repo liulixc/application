@@ -1,4 +1,3 @@
-
 #ifndef SLE_SERVER_ADV_H
 #define SLE_SERVER_ADV_H
 
@@ -56,12 +55,7 @@ typedef enum {
 
 /**
  * @brief  sle广播数据配置。
- * @attention  NULL
- * @retval ERRCODE_SLE_SUCCESS    执行成功
- * @retval ERRCODE_SLE_FAIL       执行失败
- * @par 依赖:
- * @li NULL
- * @endif
  */
 errcode_t sle_uuid_server_adv_init(void);
+void sle_update_adv_data(void);
 #endif

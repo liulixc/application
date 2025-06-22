@@ -1,10 +1,10 @@
-config SAMPLE_SUPPORT_CLIENT
+config SAMPLE_SUPPORT_GATEWAY
     bool
-    prompt "Support client."
+    prompt "Support gateway."
     default n
     depends on ENABLE_SLE_HYBRID
     help
-        This option means support Client Sample.
+        This option means support gateway Sample.
 
 
 config SAMPLE_SUPPORT_HYBRID

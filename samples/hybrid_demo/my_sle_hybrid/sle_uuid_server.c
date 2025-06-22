@@ -15,6 +15,7 @@
 #include "sle_device_discovery.h"
 #include "sle_server_adv.h"
 #include "sle_uuid_server.h"
+#include "sle_hybrid.h"
 
 #define OCTET_BIT_LEN 8
 #define UUID_LEN_2     2
@@ -93,61 +94,14 @@ static void sle_uuid_print(sle_uuid_t *uuid)
     }
 }
 
-static void ssaps_mtu_changed_cbk(uint8_t server_id, uint16_t conn_id,  ssap_exchange_info_t *mtu_size,
-    errcode_t status)
-{
-    osal_printk("[uuid server] ssaps write request cbk server_id:%x, conn_id:%x, mtu_size:%x, status:%x\r\n",
-        server_id, conn_id, mtu_size->mtu_size, status);
-}
-
-static void ssaps_start_service_cbk(uint8_t server_id, uint16_t handle, errcode_t status)
-{
-    osal_printk("[uuid server] start service cbk server_id:%x, handle:%x, status:%x\r\n",
-        server_id, handle, status);
-}
 
 
-static void ssaps_add_service_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t handle, errcode_t status)
-{
-    printf("%s [ssaps_add_service_cbk] server_id:%x, handle:%x, status:%x\r\n", SLE_SERVER_LOG,
-           server_id, handle, status);
-    sle_uuid_print(uuid);
-}
-
-static void ssaps_add_property_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t service_handle,
-                                   uint16_t handle, errcode_t status)
-{
-    printf("%s [ssaps_add_property_cbk] server_id:%x, service_handle:%x,handle:%x, status:%x\r\n",
-           SLE_SERVER_LOG, server_id, service_handle, handle, status);
-    sle_uuid_print(uuid);
-}
-
-static void ssaps_add_descriptor_cbk(uint8_t server_id, sle_uuid_t *uuid, uint16_t service_handle,
-                                     uint16_t property_handle, errcode_t status)
-{
-    printf("%s [ssaps_add_descriptor_cbk] server_id:%x, service_handle:%x, property_handle:%x, \
-        status:%x\r\n",
-           SLE_SERVER_LOG, server_id, service_handle, property_handle, status);
-    sle_uuid_print(uuid);
-}
-
-static void ssaps_delete_all_service_cbk(uint8_t server_id, errcode_t status)
-{
-    printf("%s [ssaps_delete_all_service_cbk] server_id:%x, status:%x\r\n", SLE_SERVER_LOG,
-           server_id, status);
-}
 
 static errcode_t sle_ssaps_register_cbks(ssaps_read_request_callback ssaps_read_request_cbk,
                                          ssaps_write_request_callback ssaps_write_request_cbk)
 {
     errcode_t ret;
     ssaps_callbacks_t ssaps_cbk = {0};
-    ssaps_cbk.add_service_cb = ssaps_add_service_cbk;              
-    ssaps_cbk.add_property_cb = ssaps_add_property_cbk;            
-    ssaps_cbk.add_descriptor_cb = ssaps_add_descriptor_cbk;        
-    ssaps_cbk.start_service_cb = ssaps_start_service_cbk;          
-    ssaps_cbk.delete_all_service_cb = ssaps_delete_all_service_cbk; 
-    ssaps_cbk.mtu_changed_cb = ssaps_mtu_changed_cbk;              
     ssaps_cbk.read_request_cb = ssaps_read_request_cbk;            
     ssaps_cbk.write_request_cb = ssaps_write_request_cbk;          
     ret = SsapsRegisterCallbacks(&ssaps_cbk);                    
@@ -326,49 +280,25 @@ void sle_server_connect_state_changed_cbk(uint16_t conn_id, const sle_addr_t *ad
     if (conn_state == SLE_ACB_STATE_CONNECTED)
     {
         g_sle_conn_hdl = conn_id;
+        if (hybrid_node_get_role() == NODE_ROLE_ORPHAN) {
+            sle_stop_announce(SLE_ADV_HANDLE_DEFAULT);
+            osal_printk("Orphan connected, stop advertising.\r\n");
+        }
     }
 
     else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
         g_sle_conn_hdl = 0;
-        sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
+        if (hybrid_node_get_parent_conn_id() == conn_id) {
+            osal_printk("Disconnected from parent. Reverting to orphan.\r\n");
+            hybrid_node_revert_to_orphan();
+        } else if (hybrid_node_get_role() == NODE_ROLE_ORPHAN) {
+            osal_printk("Orphan disconnected, restart advertising.\r\n");
+            sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
+        }
     }
 }
 
-void sle_server_pair_complete_cbk(uint16_t conn_id, const sle_addr_t *addr, errcode_t status)
-{
-    osal_printk("[uuid server] pair complete conn_id:%02x, status:%x\r\n",
-        conn_id, status);
-    osal_printk("[uuid server] pair complete addr:%02x:**:**:**:%02x:%02x\r\n",
-        addr->addr[BT_INDEX_0], addr->addr[BT_INDEX_4], addr->addr[BT_INDEX_5]);
-}
 
-void sle_server_connect_param_update_req_cbk(uint16_t conn_id, errcode_t status, const sle_connection_param_update_req_t *param)
-{
-    osal_printk("[sle_server_connect_param_update_req_cbk] conn_id:%02x, status:%x, interval_min:%02x, interval_max:%02x, max_latency:%02x, supervision_timeout:%02x\r\n",
-           conn_id, status, param->interval_min, param->interval_max, param->max_latency, param->supervision_timeout);
-}
-
-void sle_server_connect_param_update_cbk(uint16_t conn_id, errcode_t status,
-    const sle_connection_param_update_evt_t *param)
-{
-    osal_printk("[sle_server_connect_param_update_cbk] conn_id:%02x, status:%x, interval:%02x, latency:%02x, supervision:%02x\r\n",
-           conn_id, status, param->interval, param->latency, param->supervision);
-}
-
-void sle_server_auth_complete_cbk(uint16_t conn_id, const sle_addr_type_t *addr, errcode_t status, const sle_auth_info_evt_t *evt)
-{
-    unused(addr);
-    osal_printk("[sle_server_auth_complete_cbk] auth complete conn_id:%02x, status:%x\r\n",
-           conn_id, status);
-    osal_printk("[sle_server_auth_complete_cbk] auth complete link_key:%02x, crypto_algo:%x, key_deriv_algo:%x, integr_chk_ind:%x\r\n",
-           evt->link_key, evt->crypto_algo, evt->key_deriv_algo, evt->integr_chk_ind);
-}
-
-void sle_server_read_rssi_cbk(uint16_t conn_id, int8_t rssi, errcode_t status)
-{
-    printf("%s [sle_server_read_rssi_cbk] conn_id:%02x, rssi:%d, status:%x\r\n",
-           conn_id, rssi, status);
-}
 
 
 static void ssaps_read_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_read_cb_t *read_cb_para,
@@ -384,6 +314,16 @@ void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_writ
     (void)server_id;
     (void)conn_id;
     (void)status;
+
+    if (write_cb_para->length == sizeof(adoption_cmd_t)) {
+        adoption_cmd_t *cmd = (adoption_cmd_t *)(write_cb_para->value);
+        if (cmd->cmd == ADOPTION_CMD) {
+            osal_printk("Adoption command received from conn_id: %d, parent_level: %d\r\n", conn_id, cmd->level);
+            hybrid_node_become_member(conn_id, cmd->level);
+            return;
+        }
+    }
+    
     write_cb_para->value[write_cb_para->length - 1] = '\0';
     printf("[ssaps_write_request_cbk] client_send_data: %s\r\n\r\n", write_cb_para->value);
 
@@ -446,11 +386,6 @@ uint8_t sle_hybrids_is_client_connected(void)
     }
 }
 
-void sle_server_sle_disable_cbk(errcode_t status)
-{
-    unused(status);
-    osal_printk("[sle_disable_cbk]:server\r\n");
-}
 
 void sle_hybrids_wait_client_connected(void)
 {

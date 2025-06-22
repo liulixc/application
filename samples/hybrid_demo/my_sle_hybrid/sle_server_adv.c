@@ -10,6 +10,8 @@
 #include "sle_device_discovery.h"
 #include "sle_errcode.h"
 #include "sle_server_adv.h"
+#include "sle_uuid_server.h"
+#include "sle_hybrid.h"
 
     
 /* sle device name */
@@ -31,7 +33,7 @@
 /* 最大广播数据长度 */
 #define SLE_ADV_DATA_LEN_MAX                      251
 /* 广播名称 */
-static uint8_t sle_local_name[NAME_MAX_LENGTH] = "hybrid_n_node";
+static uint8_t sle_local_name[NAME_MAX_LENGTH] = "hi_mesh_node";
 
 
 static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
@@ -52,40 +54,49 @@ static uint16_t sle_set_adv_local_name(uint8_t *adv_data, uint16_t max_len)
         osal_printk("[sle_set_adv_local_name] memcpy fail\r\n");
         return 0;
     }
-    return (uint16_t)index + local_name_len;
+    uint16_t name_len_total = (uint16_t)index + local_name_len;
+
+    /* 添加自定义网络状态广播 */
+    network_adv_data_t net_adv_data = {
+        .len = sizeof(network_adv_data_t) - 1, // len字段不包含自身
+        .type = 0xFF, // Manufacturer Specific Data
+        .company_id = 0x0040, // 假设的公司ID
+        .role = hybrid_node_get_role(),
+        .level = hybrid_node_get_level(),
+    };
+    if (max_len - name_len_total < sizeof(net_adv_data)) {
+        osal_printk("[sle_set_adv_local_name] not enough space for net adv data\r\n");
+        return name_len_total;
+    }
+    ret = memcpy_s(&adv_data[name_len_total], max_len - name_len_total, &net_adv_data, sizeof(net_adv_data));
+    if (ret != EOK) {
+        osal_printk("[sle_set_adv_local_name] net adv data memcpy fail\r\n");
+        return name_len_total;
+    }
+
+    return name_len_total + (uint16_t)sizeof(net_adv_data);
 }
 
 static uint16_t sle_set_adv_data(uint8_t *adv_data)
 {
-    size_t len = 0;
     uint16_t idx = 0;
-    errno_t  ret = 0;
+    errno_t ret;
 
-    len = sizeof(struct sle_adv_common_value);
-    struct sle_adv_common_value adv_disc_level = {
-        .length = len - 1,
-        .type = SLE_ADV_DATA_TYPE_DISCOVERY_LEVEL,
-        .value = SLE_ANNOUNCE_LEVEL_NORMAL,
+    /* 添加自定义网络状态广播 */
+    network_adv_data_t net_adv_data = {
+        .len = sizeof(network_adv_data_t) - 1, // len字段不包含自身
+        .type = 0xFF, // Manufacturer Specific Data
+        .company_id = 0x0040, // 厂商ID (示例)
+        .role = hybrid_node_get_role(),
+        .level = hybrid_node_get_level(),
     };
-    ret = memcpy_s(&adv_data[idx], SLE_ADV_DATA_LEN_MAX - idx, &adv_disc_level, len);
+
+    ret = memcpy_s(&adv_data[idx], SLE_ADV_DATA_LEN_MAX - idx, &net_adv_data, sizeof(net_adv_data));
     if (ret != EOK) {
-        osal_printk("adv_disc_level memcpy fail\r\n");
+        osal_printk("net_adv_data memcpy fail\r\n");
         return 0;
     }
-    idx += len;
-
-    len = sizeof(struct sle_adv_common_value);
-    struct sle_adv_common_value adv_access_mode = {
-        .length = len - 1,
-        .type = SLE_ADV_DATA_TYPE_ACCESS_MODE,
-        .value = 0,
-    };
-    ret = memcpy_s(&adv_data[idx], SLE_ADV_DATA_LEN_MAX - idx, &adv_access_mode, len);
-    if (ret != EOK) {
-        osal_printk("memcpy fail\r\n");
-        return 0;
-    }
-    idx += len;
+    idx += sizeof(net_adv_data);
     return idx;
 }
 
@@ -93,22 +104,8 @@ static uint16_t sle_set_adv_data(uint8_t *adv_data)
 static uint16_t sle_set_scan_response_data(uint8_t *scan_rsp_data)
 {
     uint16_t idx = 0;
-    errno_t ret;
-    size_t scan_rsp_data_len = sizeof(struct sle_adv_common_value);
-
-    struct sle_adv_common_value tx_power_level = {
-        .length = scan_rsp_data_len - 1,
-        .type = SLE_ADV_DATA_TYPE_TX_POWER_LEVEL,
-        .value = SLE_ADV_TX_POWER,
-    };
-    ret = memcpy_s(scan_rsp_data, SLE_ADV_DATA_LEN_MAX, &tx_power_level, scan_rsp_data_len);
-    if (ret != EOK) {
-        osal_printk("sle scan response data memcpy fail\r\n");
-        return 0;
-    }
-    idx += scan_rsp_data_len;
-
-    /* set local name */
+    
+    /* 在扫描响应中设置设备名称，方便调试 */
     idx += sle_set_adv_local_name(&scan_rsp_data[idx], SLE_ADV_DATA_LEN_MAX - idx);
     return idx;
 }
@@ -168,27 +165,20 @@ static int sle_set_default_announce_data(void)
     return ERRCODE_SLE_SUCCESS;
 }
 
-void sle_server_announce_enable_cbk(uint32_t announce_id, errcode_t status)
+/**
+ * @brief 更新并重启广播
+ * @note 该函数用于在节点状态改变后，更新广播包内容并重新使能广播
+ */
+void sle_update_adv_data(void)
 {
-    osal_printk("sle announce enable id:%02x, state:%02x\r\n", announce_id, status);
+    // 停止当前广播
+    sle_stop_announce(SLE_ADV_HANDLE_DEFAULT);
+    // 设置新的广播数据
+    sle_set_default_announce_data();
+    // 重新启动广播
+    sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
+    osal_printk("Advertising data updated.\r\n");
 }
-
-void sle_server_announce_disable_cbk(uint32_t announce_id, errcode_t status)
-{
-    osal_printk("sle announce disable id:%02x, state:%02x\r\n", announce_id, status);
-}
-
-void sle_server_announce_terminal_cbk(uint32_t announce_id)
-{
-    osal_printk("sle announce terminal id:%02x\r\n", announce_id);
-}
-
-void sle_enable_cbk(errcode_t status)
-{
-    osal_printk("sle enable status:%02x\r\n", status);
-}
-
-
 
 errcode_t sle_uuid_server_adv_init(void)
 {
