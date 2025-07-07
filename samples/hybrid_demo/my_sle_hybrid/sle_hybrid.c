@@ -9,6 +9,10 @@
 #include "sle_uuid_client.h"  // SLE客户端相关头文件
 #include "sle_uuid_server.h"  // SLE服务端相关头文件
 #include "sle_server_adv.h"   // SLE广播相关头文件
+#include "osal_addr.h"        // For random_mac_addr
+#include "sle_hybrid.h"       // 混合模式相关头文件
+#include "gpio.h"       // SLE通用定义头文件
+#include "pinctrl.h"  // 引脚控制头文件
 
 
 // ================== 节点状态管理 ==================
@@ -66,6 +70,8 @@ void hybrid_node_init(void)
     // 作为孤儿，只需要启动服务端功能并开始广播
     sle_hybrids_init();
     sle_hybridc_init();
+    uapi_pin_set_mode(2, PIN_MODE_0);
+    uapi_gpio_set_dir(2, GPIO_DIRECTION_OUTPUT);
     sle_update_adv_data();
 }
 
@@ -84,6 +90,7 @@ void hybrid_node_become_member(uint16_t parent_conn_id, uint8_t parent_level)
     g_network_status.parent_conn_id = parent_conn_id;
     osal_printk("Node becomes MEMBER, level %d, parent_conn_id %d\r\n", g_network_status.level, parent_conn_id);
 
+    uapi_gpio_set_val(2, GPIO_LEVEL_HIGH); // 设置GPIO引脚高电平，表示已连接
     // 作为成员，需要启动客户端功能去寻找自己的子节点
 
     sle_start_scan();
@@ -101,6 +108,9 @@ void hybrid_node_revert_to_orphan(void)
     osal_printk("Node reverting to ORPHAN from level %d\r\n", g_network_status.level);
     // 断开所有子节点的连接
     sle_hybridc_disconnect_all_children();
+
+    uapi_gpio_set_val(2, GPIO_LEVEL_LOW);
+
 
     // 停止客户端的扫描
     sle_stop_seek();
@@ -125,9 +135,26 @@ void sle_hybrid_task(char *arg)
     unused(arg);  // 处理未使用的参数
     errcode_t ret = 0;  // 操作返回状态码
     
-    // 1. 设置服务端名称，用于广播和扫描识别
-    // sle_set_server_name("hi_mesh_node");
+    static uint32_t report_counter = 0;
     
+    // 1. 设置并统一节点的MAC地址
+    sle_addr_t local_address;
+    local_address.type = SLE_ADDRESS_TYPE_PUBLIC;
+    random_mac_addr(local_address.addr); // 生成随机MAC
+    // local_address.addr[0]=0x11;
+    // local_address.addr[1]=0x22;
+    // local_address.addr[2]=0x33;
+    // local_address.addr[3]=0x44;
+    // local_address.addr[4]=0x55;
+    // local_address.addr[5]=0x01;
+    (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
+    g_local_addr.type = local_address.type;
+    sle_set_local_addr(&g_local_addr);
+    
+    osal_printk("Node MAC address: %02x:%02x:%02x:%02x:%02x:%02x\r\n",
+           g_local_addr.addr[0], g_local_addr.addr[1], g_local_addr.addr[2], 
+           g_local_addr.addr[3], g_local_addr.addr[4], g_local_addr.addr[5]);
+
     // 2. 注册SLE通用回调函数
     sle_register_common_cbks();
 
@@ -142,9 +169,6 @@ void sle_hybrid_task(char *arg)
 
     // 5. 初始化节点为孤儿状态
     hybrid_node_init();
-
-    // 6. 设置客户端地址
-    sle_set_hybridc_addr();
     
     // 7. 主循环，可以根据节点状态执行不同的逻辑
     while (1) {
@@ -155,6 +179,16 @@ void sle_hybrid_task(char *arg)
                     g_network_status.level,
                     g_network_status.parent_conn_id,
                     get_active_children_count());
+                     // 作为成员节点，且有父节点连接时，上报自己的数据
+                     
+        if (g_network_status.role == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
+            report_data_t data_to_report;
+            data_to_report.data = report_counter++;
+            (void)memcpy_s(data_to_report.origin_mac, SLE_ADDR_LEN, g_local_addr.addr, SLE_ADDR_LEN);
+
+            osal_printk("Member node sending its own data, count: %u\r\n", data_to_report.data);
+            sle_hybrids_send_data((uint8_t*)&data_to_report, sizeof(data_to_report));
+        }
     }
 }
 

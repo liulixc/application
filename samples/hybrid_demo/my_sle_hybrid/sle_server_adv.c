@@ -115,9 +115,8 @@ static int sle_set_default_announce_param(void)
     errcode_t ret = 0;
     sle_announce_param_t param = {0};
     uint8_t index;
+    sle_addr_t *local_addr = hybrid_get_local_addr();
 
-    unsigned char local_addr[SLE_ADDR_LEN] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x08 };
-    random_mac_addr(local_addr); 
     param.announce_mode = SLE_ANNOUNCE_MODE_CONNECTABLE_SCANABLE;
     param.announce_handle = SLE_ADV_HANDLE_DEFAULT;
     param.announce_gt_role = SLE_ANNOUNCE_ROLE_T_CAN_NEGO;
@@ -129,7 +128,7 @@ static int sle_set_default_announce_param(void)
     param.conn_interval_max = SLE_CONN_INTV_MAX_DEFAULT;
     param.conn_max_latency = SLE_CONN_MAX_LATENCY;
     param.conn_supervision_timeout = SLE_CONN_SUPERVISION_TIMEOUT_DEFAULT;
-    ret = memcpy_s(param.own_addr.addr, SLE_ADDR_LEN, local_addr, SLE_ADDR_LEN);
+    ret = memcpy_s(param.own_addr.addr, SLE_ADDR_LEN, local_addr->addr, SLE_ADDR_LEN);
     if (ret != EOK) {
         osal_printk("[server] sle_set_default_announce_param data memcpy fail\r\n");
         return 0;
