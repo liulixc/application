@@ -187,7 +187,11 @@ void sle_hybrid_task(char *arg)
             (void)memcpy_s(data_to_report.origin_mac, SLE_ADDR_LEN, g_local_addr.addr, SLE_ADDR_LEN);
 
             osal_printk("Member node sending its own data, count: %u\r\n", data_to_report.data);
-            sle_hybrids_send_data((uint8_t*)&data_to_report, sizeof(data_to_report));
+            // sle_hybrids_send_data((uint8_t*)&data_to_report.data, sizeof(data_to_report));
+            
+            char test[8]="666_hi1";
+            sle_hybrids_send_data((uint8_t*)test, 8);
+
         }
     }
 }

@@ -54,7 +54,6 @@ void LED_Control_report_task(void)
 {
     while(1)
     {
-
         sle_uuid_server_send_report_by_handle(test,sizeof(test));
         osal_msleep(2000);
     }
