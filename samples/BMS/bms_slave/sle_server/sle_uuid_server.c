@@ -230,9 +230,11 @@
     ssaps_ntf_ind_t param = {0};
     param.handle = g_property_handle;
     param.type = SSAP_PROPERTY_TYPE_VALUE;
-    // 直接使用传入的数据指针和长度，不再受本地缓冲区大小限制
     param.value = (uint8_t*)data;
     param.value_len = len;
+    if (memcpy_s(param.value, param.value_len, data, len) != EOK) {
+        return ERRCODE_SLE_FAIL;
+    }
     return ssaps_notify_indicate(g_server_id, g_sle_conn_hdl, &param);
  }
  

@@ -8,6 +8,9 @@ typedef enum {
     NET_TYPE_NONE
 } net_type_t;
 
+// 最大支持的BMS设备数
+#define MAX_BMS_DEVICES 32 // 树状网络下，增加网关可管理的总设备数
+
 typedef struct {
     char receive_payload[256];
     float temperature[5];

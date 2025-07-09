@@ -246,10 +246,10 @@
      }
  }
  
- static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
+static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_id,
                                                ssapc_find_structure_result_t *structure_result,
                                                errcode_t status)
- {
+{
      unused(client_id);
      unused(structure_result);
      osal_printk("%s Find structure complete, conn_id:%u, status:%d\r\n", SLE_CLIENT_LOG, conn_id, status);
@@ -272,33 +272,30 @@
  }
  
  void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
-                             errcode_t status)
- {
-     (void)client_id;
-     if (status != ERRCODE_SUCC || data == NULL || data->data == NULL) {
-         osal_printk("%s Notification error or empty data. conn_id:%u, status:%d\r\n", SLE_CLIENT_LOG, conn_id, status);
-         return;
-     }
- 
-     // 确保收到的数据是安全的字符串，以便打印
-     data->data[data->data_len - 1] = '\0';
- 
-     // 打印从子节点收到的JSON字符串
-     osal_printk("%s [DATA RECV] from child conn_id %u. Data: %s\r\n",
-                 SLE_CLIENT_LOG,
-                 conn_id,
-                 (char*)data->data);
- 
-     // 如果当前节点是“成员”，则必须将数据包原封不动地转发给父节点
-     if (hybrid_node_get_role() == NODE_ROLE_MEMBER) {
-         osal_printk("%s [DATA FORWARD] Relaying data to parent...\r\n", SLE_CLIENT_LOG);
-         // 转发收到的原始数据包（即JSON字符串）
-         errcode_t ret = sle_hybrids_send_data(data->data, data->data_len);
-         if (ret != ERRCODE_SUCC) {
-             osal_printk("%s Failed to forward data to parent. Error: %d\r\n", SLE_CLIENT_LOG, ret);
-         }
-     }
- }
+    errcode_t status)
+{
+    (void)client_id;
+    if (status != ERRCODE_SUCC || data == NULL || data->data == NULL) {
+        osal_printk("%s Notification error or empty data. conn_id:%u, status:%d\r\n", SLE_CLIENT_LOG, conn_id, status);
+        return;
+    }
+
+    // 确保收到的数据是安全的字符串，以便打印
+    data->data[data->data_len - 1] = '\0';
+
+    // 打印从子节点收到的JSON字符串
+    osal_printk("%s [DATA RECV] from child conn_id %u. Data: %s\r\n",SLE_CLIENT_LOG,conn_id,(char*)data->data);
+
+    // 如果当前节点是“成员”，则必须将数据包原封不动地转发给父节点
+    if (hybrid_node_get_role() == NODE_ROLE_MEMBER) {
+        osal_printk("%s [DATA FORWARD] Relaying data to parent...\r\n", SLE_CLIENT_LOG);
+        // 转发收到的原始数据包（即JSON字符串）
+        errcode_t ret = sle_hybrids_send_data(data->data, data->data_len);
+        if (ret != ERRCODE_SUCC) {
+            osal_printk("%s Failed to forward data to parent. Error: %d\r\n", SLE_CLIENT_LOG, ret);
+        }
+    }
+}
  
  void ssapc_indication_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,
                            errcode_t status)

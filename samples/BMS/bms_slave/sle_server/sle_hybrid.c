@@ -135,8 +135,6 @@ void sle_hybrid_task(char *arg)
     unused(arg);  // 处理未使用的参数
     errcode_t ret = 0;  // 操作返回状态码
     
-    static uint32_t report_counter = 0;
-    
     // 1. 设置并统一节点的MAC地址
     sle_addr_t local_address;
     local_address.type = SLE_ADDRESS_TYPE_PUBLIC;
@@ -181,19 +179,19 @@ void sle_hybrid_task(char *arg)
                     get_active_children_count());
                      // 作为成员节点，且有父节点连接时，上报自己的数据
                      
-        if (g_network_status.role == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
-            report_data_t data_to_report;
-            data_to_report.data = report_counter++;
-            (void)memcpy_s(data_to_report.origin_mac, SLE_ADDR_LEN, g_local_addr.addr, SLE_ADDR_LEN);
+        // if (g_network_status.role == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
+        //     msg_data_t data_to_report;
+        //     data_to_report.value = report_counter++;
+        //     (void)memcpy_s(data_to_report.origin_mac, SLE_ADDR_LEN, g_local_addr.addr, SLE_ADDR_LEN);
 
-            osal_printk("Member node sending its own data, count: %u\r\n", data_to_report.data);
-            sle_hybrids_send_data((uint8_t*)&data_to_report, sizeof(report_data_t));
-        }
+        //     osal_printk("Member node sending its own data, count: %u\r\n", data_to_report.data);
+        //     sle_hybrids_send_data((uint8_t*)&data_to_report, sizeof(report_data_t));
+        // }
     }
 }
 
 // 任务优先级和栈大小定义
-#define SLE_HYBRIDTASK_PRIO 24          // 混合模式任务优先级
+#define SLE_HYBRIDTASK_PRIO 17          // 混合模式任务优先级
 #define SLE_HYBRID_STACK_SIZE 0x2000    // 混合模式任务栈大小(8KB)
 
 /**

@@ -22,14 +22,15 @@
 #include "osal_debug.h"
 #include "soc_osal.h"
 #include "app_init.h"
-#include "ssd1306.h"
 #include "bms_slave.h"
 #include "malloc.h"
 #include "cJSON_Utils.h"
-#include "sle_uart_server.h"
 #include "pinctrl.h"
 #include "adc.h"
 #include "adc_porting.h"
+#include "sle_uuid_server.h"
+#include "sle_hybrid.h"
+ #include "gpio.h"     // GPIO 操作相关头文件
 
 #define SPI_SLAVE_NUM 1
 #define SPI_BUS_CLK 32000000
@@ -337,7 +338,7 @@ void init_cfg(void)
 
     for(i = 0; i<TOTAL_IC;i++)
     {
-        tx_cfg[i][0] = 0xBE ;   //GPIO引脚下拉电路关断(bit8~bit4) | 基准保持上电状态(bit3) | SWTEN处于逻辑1(软件定时器势使能) | ADC模式选择为0
+        tx_cfg[i][0] = 0xBA ;   //GPIO引脚下拉电路关断(bit8~bit4) | 基准保持上电状态(bit3) | SWTEN处于逻辑1(软件定时器势使能) | ADC模式选择为0
         tx_cfg[i][1] = 0x00 ;   
         tx_cfg[i][2] = 0x00 ;   
         tx_cfg[i][3] = 0x00 ;
@@ -966,13 +967,137 @@ void  Balance_task(uint16_t mv)    //计算哪个电池需要均衡
 }
 
 
+int MOD_VOL = 0;
+
+uint8_t Get_SOC(void)
+{
+    int SOC = 0;
+
+    //cell_codes[12] = MOD_VOL;
+
+  if(MOD_VOL >(4180*120)){SOC=100;}
+	else if((MOD_VOL >(4169*120))&&(MOD_VOL <(4180*120))){SOC=99;}
+	else if((MOD_VOL >(4157*120))&&(MOD_VOL <(4169*120))){SOC=98;}
+	else if((MOD_VOL >(4146*120))&&(MOD_VOL <(4157*120))){SOC=97;}
+	else if((MOD_VOL >(4134*120))&&(MOD_VOL <(4146*120))){SOC=96;}
+	else if((MOD_VOL >(4123*120))&&(MOD_VOL <(4134*120))){SOC=95;}
+	else if((MOD_VOL >(4111*120))&&(MOD_VOL <(4123*120))){SOC=94;}
+	else if((MOD_VOL >(4099*120))&&(MOD_VOL <(4111*120))){SOC=93;}
+	else if((MOD_VOL >(4088*120))&&(MOD_VOL <(4099*120))){SOC=92;}
+	else if((MOD_VOL >(4076*120))&&(MOD_VOL <(4088*120))){SOC=91;}
+	else if((MOD_VOL >(4063*120))&&(MOD_VOL <(4076*120))){SOC=90;}
+	else if((MOD_VOL >(4051*120))&&(MOD_VOL <(4063*120))){SOC=89;}
+	else if((MOD_VOL >(4040*120))&&(MOD_VOL <(4051*120))){SOC=88;}
+	else if((MOD_VOL >(4028*120))&&(MOD_VOL <(4040*120))){SOC=87;}
+	else if((MOD_VOL >(4017*120))&&(MOD_VOL <(4028*120))){SOC=86;}
+	else if((MOD_VOL >(4005*120))&&(MOD_VOL <(4017*120))){SOC=85;}
+	else if((MOD_VOL >(3994*120))&&(MOD_VOL <(4005*120))){SOC=84;}
+	else if((MOD_VOL >(3982*120))&&(MOD_VOL <(3994*120))){SOC=83;}
+	else if((MOD_VOL >(3971*120))&&(MOD_VOL <(3982*120))){SOC=82;}
+	else if((MOD_VOL >(3960*120))&&(MOD_VOL <(3971*120))){SOC=81;}
+	else if((MOD_VOL >(3949*120))&&(MOD_VOL <(3960*120))){SOC=80;}
+	else if((MOD_VOL >(3938*120))&&(MOD_VOL <(3949*120))){SOC=79;}
+	else if((MOD_VOL >(3927*120))&&(MOD_VOL <(3938*120))){SOC=78;}
+	else if((MOD_VOL >(3916*120))&&(MOD_VOL <(3927*120))){SOC=77;}
+	else if((MOD_VOL >(3906*120))&&(MOD_VOL <(3916*120))){SOC=76;}
+	else if((MOD_VOL >(3895*120))&&(MOD_VOL <(3906*120))){SOC=75;}
+	else if((MOD_VOL >(3885*120))&&(MOD_VOL <(3895*120))){SOC=74;}
+	else if((MOD_VOL >(3875*120))&&(MOD_VOL <(3885*120))){SOC=73;}
+	else if((MOD_VOL >(3865*120))&&(MOD_VOL <(3875*120))){SOC=72;}
+	else if((MOD_VOL >(3855*120))&&(MOD_VOL <(3865*120))){SOC=71;}
+	else if((MOD_VOL >(3845*120))&&(MOD_VOL <(3855*120))){SOC=70;}
+	else if((MOD_VOL >(3836*120))&&(MOD_VOL <(3845*120))){SOC=69;}
+	else if((MOD_VOL >(3827*120))&&(MOD_VOL <(3836*120))){SOC=68;}
+	else if((MOD_VOL >(3818*120))&&(MOD_VOL <(3827*120))){SOC=67;}
+	else if((MOD_VOL >(3809*120))&&(MOD_VOL <(3818*120))){SOC=66;}
+	else if((MOD_VOL >(3800*120))&&(MOD_VOL <(3809*120))){SOC=65;}
+	else if((MOD_VOL >(3792*120))&&(MOD_VOL <(3800*120))){SOC=64;}
+	else if((MOD_VOL >(3784*120))&&(MOD_VOL <(3792*120))){SOC=63;}
+	else if((MOD_VOL >(3775*120))&&(MOD_VOL <(3784*120))){SOC=62;}
+	else if((MOD_VOL >(3768*120))&&(MOD_VOL <(3775*120))){SOC=61;}
+	else if((MOD_VOL >(3760*120))&&(MOD_VOL <(3768*120))){SOC=60;}
+	else if((MOD_VOL >(3753*120))&&(MOD_VOL <(3768*120))){SOC=59;}
+	else if((MOD_VOL >(3745*120))&&(MOD_VOL <(3753*120))){SOC=58;}
+	else if((MOD_VOL >(3738*120))&&(MOD_VOL <(3745*120))){SOC=57;}
+	else if((MOD_VOL >(3732*120))&&(MOD_VOL <(3738*120))){SOC=56;}
+	else if((MOD_VOL >(3725*120))&&(MOD_VOL <(3732*120))){SOC=55;}
+	else if((MOD_VOL >(3719*120))&&(MOD_VOL <(3725*120))){SOC=54;}
+	else if((MOD_VOL >(3713*120))&&(MOD_VOL <(3719*120))){SOC=53;}
+	else if((MOD_VOL >(3707*120))&&(MOD_VOL <(3713*120))){SOC=52;}
+	else if((MOD_VOL >(3701*120))&&(MOD_VOL <(3707*120))){SOC=51;}
+	else if((MOD_VOL >(3695*120))&&(MOD_VOL <(3701*120))){SOC=50;}
+	else if((MOD_VOL >(3690*120))&&(MOD_VOL <(3695*120))){SOC=49;}
+	else if((MOD_VOL >(3685*120))&&(MOD_VOL <(3690*120))){SOC=48;}
+	else if((MOD_VOL >(3679*120))&&(MOD_VOL <(3685*120))){SOC=47;}
+	else if((MOD_VOL >(3675*120))&&(MOD_VOL <(3679*120))){SOC=46;}
+	else if((MOD_VOL >(3670*120))&&(MOD_VOL <(3675*120))){SOC=45;}
+	else if((MOD_VOL >(3665*120))&&(MOD_VOL <(3670*120))){SOC=44;}
+	else if((MOD_VOL >(3661*120))&&(MOD_VOL <(3665*120))){SOC=43;}
+	else if((MOD_VOL >(3657*120))&&(MOD_VOL <(3661*120))){SOC=42;}
+	else if((MOD_VOL >(3652*120))&&(MOD_VOL <(3657*120))){SOC=41;}
+	else if((MOD_VOL >(3648*120))&&(MOD_VOL <(3652*120))){SOC=40;}
+	else if((MOD_VOL >(3645*120))&&(MOD_VOL <(3648*120))){SOC=39;}
+	else if((MOD_VOL >(3641*120))&&(MOD_VOL <(3645*120))){SOC=38;}
+	else if((MOD_VOL >(3637*120))&&(MOD_VOL <(3641*120))){SOC=37;}
+	else if((MOD_VOL >(3633*120))&&(MOD_VOL <(3637*120))){SOC=36;}
+	else if((MOD_VOL >(3630*120))&&(MOD_VOL <(3633*120))){SOC=35;}
+	else if((MOD_VOL >(3626*120))&&(MOD_VOL <(3630*120))){SOC=34;}
+	else if((MOD_VOL >(3623*120))&&(MOD_VOL <(3626*120))){SOC=33;}
+	else if((MOD_VOL >(3619*120))&&(MOD_VOL <(3623*120))){SOC=32;}
+	else if((MOD_VOL >(3616*120))&&(MOD_VOL <(3619*120))){SOC=31;}
+	else if((MOD_VOL >(3613*120))&&(MOD_VOL <(3616*120))){SOC=30;}
+	else if((MOD_VOL >(3609*120))&&(MOD_VOL <(3613*120))){SOC=29;}
+	else if((MOD_VOL >(3606*120))&&(MOD_VOL <(3609*120))){SOC=28;}
+	else if((MOD_VOL >(3602*120))&&(MOD_VOL <(3606*120))){SOC=27;}
+	else if((MOD_VOL >(3599*120))&&(MOD_VOL <(3602*120))){SOC=26;}
+	else if((MOD_VOL >(3595*120))&&(MOD_VOL <(3599*120))){SOC=25;}
+	else if((MOD_VOL >(3592*120))&&(MOD_VOL <(3595*120))){SOC=24;}
+	else if((MOD_VOL >(3588*120))&&(MOD_VOL <(3292*120))){SOC=23;}
+	else if((MOD_VOL >(3584*120))&&(MOD_VOL <(3588*120))){SOC=22;}
+	else if((MOD_VOL >(3580*120))&&(MOD_VOL <(3584*120))){SOC=21;}
+	else if((MOD_VOL >(3576*120))&&(MOD_VOL <(3580*120))){SOC=20;}
+	else if((MOD_VOL >(3571*120))&&(MOD_VOL <(3576*120))){SOC=19;}
+	else if((MOD_VOL >(3567*120))&&(MOD_VOL <(3571*120))){SOC=18;}
+	else if((MOD_VOL >(3562*120))&&(MOD_VOL <(3567*120))){SOC=17;}
+	else if((MOD_VOL >(3557*120))&&(MOD_VOL <(3562*120))){SOC=16;}
+	else if((MOD_VOL >(3552*120))&&(MOD_VOL <(3557*120))){SOC=15;}
+	else if((MOD_VOL >(3546*120))&&(MOD_VOL <(3552*120))){SOC=14;}
+	else if((MOD_VOL >(3540*120))&&(MOD_VOL <(3546*120))){SOC=13;}
+	else if((MOD_VOL >(3534*120))&&(MOD_VOL <(3540*120))){SOC=12;}
+	else if((MOD_VOL >(3528*120))&&(MOD_VOL <(3534*120))){SOC=11;}
+	else if((MOD_VOL >(3521*120))&&(MOD_VOL <(3528*120))){SOC=10;}
+	else if((MOD_VOL >(3513*120))&&(MOD_VOL <(3521*120))){SOC=9;}
+	else if((MOD_VOL >(3506*120))&&(MOD_VOL <(3513*120))){SOC=8;}
+	else if((MOD_VOL >(3498*120))&&(MOD_VOL <(3506*120))){SOC=7;}
+	else if((MOD_VOL >(3489*120))&&(MOD_VOL <(3498*120))){SOC=6;}
+	else if((MOD_VOL >(3480*120))&&(MOD_VOL <(3489*120))){SOC=5;}
+	else if((MOD_VOL >(3470*120))&&(MOD_VOL <(3480*120))){SOC=4;}
+	else if((MOD_VOL >(3460*120))&&(MOD_VOL <(3470*120))){SOC=3;}
+	else if((MOD_VOL >(3449*120))&&(MOD_VOL <(3460*120))){SOC=2;}
+	else if((MOD_VOL >(3438*120))&&(MOD_VOL <(3449*120))){SOC=1;}
+	else if( MOD_VOL <(3438*120)){SOC=0;}
+    
+    printf("SOC:%d \r\n",SOC);
+
+    //osal_mdelay(10);
+
+    return SOC;
+}
 
 
+float LTC6804_Calculate_Temperature(float adc_value) {
+  float Rt =(100*adc_value)/(30000-adc_value);  //某温度下Rt的值
+//	printf("Rt%f\r\n",Rt);
+	float temp1=log(Rt/100);
+	float temp2=temp1/4150;
+	float temp3=1/298.15;
+	float T=((1/(temp2+temp3))-273.15)*1000;  //计算温度
+  return T;}
 
 
 /******************************************************************   END   *****************************************************************/
 
-
+extern network_adv_data_t g_network_status;
 
 void *bms_salve_task(void)
 {
@@ -985,18 +1110,28 @@ void *bms_salve_task(void)
     uint8_t adc_channel = CONFIG_ADC_CHANNEL;
     uint16_t voltage = 0;
 
+    uapi_pin_set_mode(13, HAL_PIO_FUNC_GPIO);
+    uapi_pin_set_mode(14, HAL_PIO_FUNC_GPIO);
+ // 设置 GPIO 引脚方向为输出
+    uapi_gpio_set_dir(13, GPIO_DIRECTION_OUTPUT);
+    uapi_gpio_set_dir(14, GPIO_DIRECTION_OUTPUT);
+ // 初始化 GPIO 引脚为低电平（LED 关闭）
+    uapi_gpio_set_val(13, GPIO_LEVEL_HIGH);
+    uapi_gpio_set_val(14, GPIO_LEVEL_HIGH);
+
     LTC6804_initialize();//通讯正常
     printf("\r\n");
     osal_mdelay(10);
+    int Current = 0.0f;
+    
 
     while (1) {
-        int MOD_VOL = 0;
+        MOD_VOL = 0;
         for(int i=0;i<12;i++)
         {
             MOD_VOL += cell_codes[0][i];
         }
-        // printf("MOD_VOL:%d \r\n",MOD_VOL);
-        // osal_mdelay(10);
+        Get_SOC();
         Get_Cell_Voltage_Max_Min();
 	    Balance_task(300);
         wakeup_sleep();
@@ -1011,7 +1146,54 @@ void *bms_salve_task(void)
         LTC6804_rdaux(0, Total_IC, gpiocode);//00 0c    00 0e
         osal_mdelay(10);
         adc_port_read(adc_channel, &voltage);
-        osal_printk("voltage: %d mv\r\n", voltage);
+         printf("ADC Voltage:%d \r\n",voltage);
+        Current = (5.0/5.0*voltage/1000-2.5)/66.7*1000*10000;
+        osal_printk("Current: %d\r\n", Current);
+
+        for(int i = 0; i < 12; i++)//过压欠压告警
+        {
+            if((int)cell_codes[0][i] > 42000)
+            {
+                printf("OVER VOLTAGE! STOP Charging!\r\n");
+                osal_mdelay(10);
+            }
+            if((int)cell_codes[0][i] < 32400)
+            {
+                printf("LOW VOLTAGE! Charge Please!\r\n");
+                osal_mdelay(10);
+            }
+            if((int)cell_codes[0][i] > 45000)//电压异常断电
+            {
+                uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
+                uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
+                printf("Abnormal Voltage! Power has been cut off!\r\n");
+                osal_mdelay(10);
+            }
+        }
+
+        for(int i = 0; i < 5; i++)//高温告警断电
+        {
+            if((int)LTC6804_Calculate_Temperature((int)gpiocode[0][i]) > 40000)
+            {
+                uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
+                uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
+                printf("OVER Temperature! Power has been cut off!\r\n");
+                osal_mdelay(10);
+            }
+        }
+
+        if(Current < 0.2)
+        {
+            printf("Charging Current:%d mA\r\n", Current);
+        }
+        else if(Current > 0.2 && Current < 30)
+        {
+            printf("Discharging Current:%d mA\r\n", Current);
+        }
+        
+
+        
+        
         // printf("VREF2:%d \r\n",(int)gpiocode[0][5]);//从控供电正常
         // osal_mdelay(10);
         // printf("Read GPIO return ֵ%d \r\n",a);//温度回读正常
@@ -1028,30 +1210,40 @@ void *bms_salve_task(void)
         // 构建 temperatures 数组
         cJSON *temperatures = cJSON_CreateArray();
         for (int i = 0; i < 5; i++) {
-            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(gpiocode[0][i]));
+            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber((int)LTC6804_Calculate_Temperature((int)gpiocode[0][i])));
         }
         // 构建根对象
         cJSON *root = cJSON_CreateObject();
-        cJSON_AddNumberToObject(root, "total_voltage", MOD_VOL);
-        cJSON_AddItemToObject(root, "cell_voltages", cell_voltages);
+
+        // 将本机MAC地址添加到JSON对象中
+        sle_addr_t *local_addr = hybrid_get_local_addr();
+        char mac_str[18]; // xx:xx:xx:xx:xx:xx\0
+        (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02x:%02x:%02x:%02x:%02x:%02x",
+                 local_addr->addr[0], local_addr->addr[1], local_addr->addr[2],
+                 local_addr->addr[3], local_addr->addr[4], local_addr->addr[5]);
+        cJSON_AddStringToObject(root, "origin_mac", mac_str);
+
+        cJSON_AddNumberToObject(root, "total", MOD_VOL);
+        cJSON_AddItemToObject(root, "cell", cell_voltages);
         cJSON_AddItemToObject(root, "temperature", temperatures);
-        cJSON_AddNumberToObject(root, "current", 100);
+        cJSON_AddNumberToObject(root, "current", Current); 
+        cJSON_AddNumberToObject(root, "SOC", Get_SOC()); // 300mV 压差均衡开关
         
         // 打印格式JSON
         char *json_str = cJSON_Print(root);
         printf("BMS_JSON:%s\n", json_str);
         
-        //构建 JSON 字符串后
-        msg_data_t msg = {0};
-        msg.value = json_str;         // 指向 JSON 字符串
-        msg.value_len = strlen(json_str);        // 字符串长度
-        
-        sle_uart_server_send_report_by_handle(msg.value,msg.value_len);   // 通过 SLE 发送
+        if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
+            osal_printk("Member node sending its own JSON data...\r\n");
+            // 直接发送JSON字符串，长度+1以包含末尾的'\0'
+            sle_hybrids_send_data((uint8_t*)json_str, strlen(json_str) + 1);
+        }
+
         // 释放内存
         cJSON_Delete(root);
         free(json_str);
         
-        osal_mdelay(500);
+        osal_mdelay(1000); // 适当延长发送间隔
     }
     return 0;
 }

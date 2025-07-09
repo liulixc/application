@@ -16,10 +16,6 @@
 #ifndef BMS_SLAVE_H
 #define BMS_SLAVE_H
 
-typedef struct{
-        uint8_t* value;
-        uint16_t value_len;
-}msg_data_t;
 
 void *bms_salve_task(void);
 

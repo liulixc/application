@@ -235,13 +235,13 @@ void sle_gateway_find_structure_cbk(uint8_t client_id, uint16_t conn_id, ssapc_f
     osal_printk("[ssap client] find structure cbk client: %d conn_id:%d status: %d \n",client_id, conn_id, status);
     osal_printk("[ssap client] find structure start_hdl:[0x%02x], end_hdl:[0x%02x], uuid len:%d\r\n",service->start_hdl, service->end_hdl, service->uuid.len);
 
-    if (service->uuid.len == 16) {
-        osal_printk("[ssap client] structure uuid:[0x%02x][0x%02x]\r\n",service->uuid.uuid[14], service->uuid.uuid[15]); /* 14 15: uuid index */
-    } else {
-        for (uint8_t idx = 0; idx < 128; idx++) {
-            osal_printk("[ssap client] structure uuid[%d]:[0x%02x]\r\n", idx, service->uuid.uuid[idx]);
-        }
-    }
+    // if (service->uuid.len == 16) {
+    //     osal_printk("[ssap client] structure uuid:[0x%02x][0x%02x]\r\n",service->uuid.uuid[14], service->uuid.uuid[15]); /* 14 15: uuid index */
+    // } else {
+    //     for (uint8_t idx = 0; idx < 128; idx++) {
+    //         osal_printk("[ssap client] structure uuid[%d]:[0x%02x]\r\n", idx, service->uuid.uuid[idx]);
+    //     }
+    // }
     g_find_service_result.start_hdl = service->start_hdl;
     g_find_service_result.end_hdl = service->end_hdl;
     memcpy_s(&g_find_service_result.uuid, sizeof(sle_uuid_t), &service->uuid, sizeof(sle_uuid_t));
@@ -330,11 +330,22 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
                             errcode_t status)
 {
     (void)client_id;
-    (void)conn_id;
     (void)status;
 
+    if (status != ERRCODE_SUCC || data == NULL || data->data == NULL) {
+        osal_printk("%s Notification error or empty data. conn_id:%u, status:%d\r\n", SLE_GATEWAY_LOG, conn_id, status);
+        return;
+    }
+
+    // 确保收到的数据是安全的字符串，以便打印
     data->data[data->data_len - 1] = '\0';
-    printf("[ssapc_notification_cbk] server_send_data: %s\r\n", data->data);
+
+    // 网关是最终目的地，直接打印收到的JSON数据
+    // 在实际应用中，您可以在这里调用cJSON库来解析这个字符串
+    osal_printk("%s [DATA RECV] from child conn_id %u. Received JSON: %s\r\n",
+                SLE_GATEWAY_LOG,
+                conn_id,
+                (char*)data->data);
 }
 
 // void ssapc_indication_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_value_t *data,

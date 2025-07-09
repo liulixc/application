@@ -23,7 +23,6 @@
 #include "common_def.h"
 #include "wifi_connect.h"
 #include "watchdog.h"
-#include "cjson_demo.h"
 #include "cJSON.h"  // 包含cJSON库头文件
 #include "mqtt_demo.h"
 #include "l610.h"
@@ -386,11 +385,11 @@ int mqtt_task(void)
         
         // 处理下发命令
         if (g_cmd_msg_flag) {
-            if (g_cmd_msg.receive_payload[0] != '\0') {
-                beep_status = parse_json(g_cmd_msg.receive_payload);
-            } else {
-                printf("Warning: receive_payload is empty, skip parse_json\n");
-            }
+            // if (g_cmd_msg.receive_payload[0] != '\0') {
+            //     beep_status = parse_json(g_cmd_msg.receive_payload);
+            // } else {
+            //     printf("Warning: receive_payload is empty, skip parse_json\n");
+            // }
             g_cmd_msg_flag = 0;
         }
         

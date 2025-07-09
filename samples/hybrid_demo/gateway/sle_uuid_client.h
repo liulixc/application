@@ -42,10 +42,10 @@
  /**
   * @brief 数据上报结构体
   */
- typedef struct {
-     uint8_t origin_mac[6]; // 原始数据节点的MAC地址
-     uint32_t data;          // 示例数据（例如一个计数器）
- } __attribute__((packed)) report_data_t;
+  typedef struct {
+    uint8_t origin_mac[6]; // 原始数据节点的MAC地址
+    char    data[];        // 可变长数据 (例如JSON字符串)
+} __attribute__((packed)) report_data_t;
  
  // 子节点连接信息管理结构体
  typedef struct {

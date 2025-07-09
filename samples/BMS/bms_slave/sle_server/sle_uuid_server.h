@@ -55,10 +55,10 @@
  /**
  * @brief 数据上报结构体
  */
-typedef struct {
-    uint8_t origin_mac[SLE_ADDR_LEN]; // 原始数据节点的MAC地址
-    uint32_t data;                    // 示例数据（例如一个计数器）
-} __attribute__((packed)) report_data_t;
+typedef struct{
+        uint8_t* value;
+        uint16_t value_len;
+}msg_data_t;
 
  
  /**
@@ -71,7 +71,7 @@ typedef struct {
  } __attribute__((packed)) adoption_cmd_t;
  
  errcode_t sle_hybrids_init(void);
- int sle_hybrids_send_data(uint8_t *data, uint16_t length);
+ int sle_hybrids_send_data(uint8_t *data,uint16_t length);
  uint8_t sle_hybrids_is_client_connected(void);
  void sle_hybrids_wait_client_connected(void);
  #endif

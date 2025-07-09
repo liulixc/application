@@ -17,15 +17,15 @@ char *combine_strings(int str_amount, char *str1, ...)
 {
     int length = string_length(str1) + 1;
     if (length == 1) {
-        return NULL; // å¦‚æžœç¬¬ä¸€ä¸ªå­—ç¬¦ä¸²ä¸ºç©º
+        return NULL; // Èç¹ûµÚÒ»¸ö×Ö·û´®Îª¿Õ
     }
 
     char *result = malloc(length);
     if (result == NULL) {
-        return NULL; // å†…å­˜åˆ†é…å¤±è´¥
+        return NULL; // ÄÚ´æ·ÖÅäÊ§°Ü
     }
 
-    strcpy(result, str1); // å¤åˆ¶ç¬¬ä¸€ä¸ªå­—ç¬¦ä¸²
+    strcpy(result, str1); // ¸´ÖÆµÚÒ»¸ö×Ö·û´®
 
     va_list args;
     va_start(args, str1);
@@ -34,47 +34,47 @@ char *combine_strings(int str_amount, char *str1, ...)
     while (--str_amount > 0) {
         tem_str = va_arg(args, char *);
         if (tem_str == NULL) {
-            continue; // è·³è¿‡ç©ºå­—ç¬¦ä¸²
+            continue; // Ìø¹ý¿Õ×Ö·û´®
         }
         length += string_length(tem_str);
         result = realloc(result, length);
         if (result == NULL) {
-            return NULL; // å†…å­˜é‡æ–°åˆ†é…å¤±è´¥
+            return NULL; // ÄÚ´æÖØÐÂ·ÖÅäÊ§°Ü
         }
-        strcat(result, tem_str); // æ‹¼æŽ¥å­—ç¬¦ä¸²
+        strcat(result, tem_str); // Æ´½Ó×Ö·û´®
     }
     va_end(args);
 
-    return result; // è¿”å›žæ‹¼æŽ¥åŽçš„å­—ç¬¦ä¸²
+    return result; // ·µ»ØÆ´½ÓºóµÄ×Ö·û´®
 }
 
 char *make_json(char *service_id, char *temperature, char *current)
 {
-    // åˆ›å»º JSON å¯¹è±¡
+    // ´´½¨ JSON ¶ÔÏó
     cJSON *root = cJSON_CreateObject();
-    // åˆ›å»º services æ•°ç»„
+    // ´´½¨ services Êý×é
     cJSON *services = cJSON_CreateArray();
-    // åˆ›å»º service å¯¹è±¡
+    // ´´½¨ service ¶ÔÏó
     cJSON *service = cJSON_CreateObject();
     cJSON_AddStringToObject(service, "service_id", service_id);
 
-    // åˆ›å»º properties å¯¹è±¡
+    // ´´½¨ properties ¶ÔÏó
     cJSON *properties = cJSON_CreateObject();
     cJSON_AddStringToObject(properties, "temperature", temperature);
     cJSON_AddStringToObject(properties, "current", current);
 
-    // å°† properties æ·»åŠ åˆ° service
+    // ½« properties Ìí¼Óµ½ service
     cJSON_AddItemToObject(service, "properties", properties);
 
-    // å°† service æ·»åŠ åˆ° services æ•°ç»„
+    // ½« service Ìí¼Óµ½ services Êý×é
     cJSON_AddItemToArray(services, service);
 
-    // å°† services æ·»åŠ åˆ° root
+    // ½« services Ìí¼Óµ½ root
     cJSON_AddItemToObject(root, "services", services);
 
-    // æ‰“å° JSON å­—ç¬¦ä¸²
+    // ´òÓ¡ JSON ×Ö·û´®
     char *json_string = cJSON_Print(root);
-    // é‡Šæ”¾å†…å­˜
+    // ÊÍ·ÅÄÚ´æ
     cJSON_Delete(root);
     return json_string;
 }
@@ -82,23 +82,23 @@ char *make_json(char *service_id, char *temperature, char *current)
 char *parse_json(char *json_string)
 {
     char *string = NULL;
-    // è§£æž JSON å­—ç¬¦ä¸²
+    // ½âÎö JSON ×Ö·û´®
     cJSON *root = cJSON_Parse(json_string);
     if (root == NULL) {
         printf("Error parsing JSON\n");
         return NULL;
     }
-    // èŽ·å– paras å¯¹è±¡ä¸­çš„ beep é¡¹
+    // »ñÈ¡ paras ¶ÔÏóÖÐµÄ beep Ïî
     cJSON *paras = cJSON_GetObjectItem(root, "paras");
     cJSON *beep = cJSON_GetObjectItem(paras, "beep");
-    // æ£€æŸ¥å¹¶è¾“å‡º beep çš„å€¼
+    // ¼ì²é²¢Êä³ö beep µÄÖµ
     if (beep && cJSON_IsString(beep)) {
         printf("beep: %s\n", beep->valuestring);
         string = beep->valuestring;
     } else {
         printf("beep not found or is not a string\n");
     }
-    // é‡Šæ”¾å†…å­˜
+    // ÊÍ·ÅÄÚ´æ
     cJSON_Delete(root);
     return string;
 }
