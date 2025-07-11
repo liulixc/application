@@ -57,5 +57,4 @@ typedef enum {
  * @brief  sle广播数据配置。
  */
 errcode_t sle_uuid_server_adv_init(void);
-void sle_update_adv_data(void);
 #endif

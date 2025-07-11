@@ -164,20 +164,6 @@ static int sle_set_default_announce_data(void)
     return ERRCODE_SLE_SUCCESS;
 }
 
-/**
- * @brief 更新并重启广播
- * @note 该函数用于在节点状态改变后，更新广播包内容并重新使能广播
- */
-void sle_update_adv_data(void)
-{
-    // 停止当前广播
-    sle_stop_announce(SLE_ADV_HANDLE_DEFAULT);
-    // 设置新的广播数据
-    sle_set_default_announce_data();
-    // 重新启动广播
-    sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
-    osal_printk("Advertising data updated.\r\n");
-}
 
 errcode_t sle_uuid_server_adv_init(void)
 {

@@ -250,7 +250,6 @@
      
      if (conn_state == SLE_ACB_STATE_CONNECTED)
      {
-         g_sle_conn_hdl = conn_id;
          if (hybrid_node_get_role() == NODE_ROLE_ORPHAN) {
              sle_stop_announce(SLE_ADV_HANDLE_DEFAULT);
              osal_printk("Orphan connected, stop advertising.\r\n");
@@ -258,14 +257,10 @@
      }
  
      else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
-         g_sle_conn_hdl = 0;
-         if (hybrid_node_get_parent_conn_id() == conn_id) {
-             osal_printk("Disconnected from parent. Reverting to orphan.\r\n");
-             hybrid_node_revert_to_orphan();
-         } else if (hybrid_node_get_role() == NODE_ROLE_ORPHAN) {
-             osal_printk("Orphan disconnected, restart advertising.\r\n");
-             sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
-         }
+        
+        osal_printk("Disconnected from parent. Reverting to orphan.\r\n");
+        hybrid_node_revert_to_orphan();
+
      }
  }
  

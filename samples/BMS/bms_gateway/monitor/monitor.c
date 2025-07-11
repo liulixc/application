@@ -14,7 +14,7 @@
 #include "mqtt_demo.h"
 
 #define UART_SIZE_DEFAULT 1024
-#define MAX_BMS_DEVICES 8  // 设备数量上限
+#define MAX_BMS_DEVICES 2  // 设备数量上限
 
 unsigned long g_msg_queue = 0;
 unsigned int g_msg_rev_size = sizeof(msg_data_t);
@@ -77,14 +77,16 @@ static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
     return ret;
 }
 
+// 外部声明
+extern volatile environment_msg g_env_msg[];
+extern uint8_t get_active_device_count(void);
+extern bool is_device_active[12]; // 设备活跃状态数组
+extern net_type_t current_net; // 当前网络状态
 static void *monitorTX_task(char *arg)
 {
     unused(arg);
     
-    // 外部声明
-    extern volatile environment_msg g_env_msg[];
-    extern bms_device_map_t g_bms_device_map[];
-    extern uint8_t get_active_device_count(void);
+    
     
     while (1) {
         // 检查是否有活跃的BMS设备连接
@@ -94,67 +96,73 @@ static void *monitorTX_task(char *arg)
             cJSON *root = cJSON_CreateObject();
             cJSON *devices = cJSON_CreateArray();
             
-            // 遍历所有活跃设备
-            for (int i = 0; i < MAX_BMS_DEVICES; i++) {
-                if (g_bms_device_map[i].is_active) {
-                    int idx = g_bms_device_map[i].device_index;
-                    
-                    // 创建单个设备的JSON
-                    cJSON *device = cJSON_CreateObject();
-                    cJSON_AddStringToObject(device, "device_id", g_bms_device_map[i].cloud_device_id);
-                    
-                    cJSON *services = cJSON_CreateArray();
-                    cJSON *service = cJSON_CreateObject();
-                    cJSON_AddStringToObject(service, "service_id", "ws63");
-                    
-                    cJSON *props = cJSON_CreateObject();
-                    
-                    // 添加温度数组，限制为小数点后一位
-                    cJSON *temp_array = cJSON_CreateArray();
-                    char temp_buffer[16];
-                    for (int t = 0; t < 5; t++) {
-                        snprintf(temp_buffer, sizeof(temp_buffer), "%.4f", g_env_msg[idx].temperature[t]/500.0f);
-                        cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(atof(temp_buffer)));
-                    }
-                    cJSON_AddItemToObject(props, "temperature", temp_array);
-                    
-                    // 添加其他属性
-                    // 使用格式化方式限制小数点后两位
-                    char num_buffer[16];
-                    
-                    // 格式化电流，限制为小数点后两位
-                    snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].current/100.0f);
-                    cJSON_AddNumberToObject(props, "current", atof(num_buffer));
-                    
-                    // 格式化总电压，限制为小数点后两位
-                    snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].total_voltage/10000.0f);
-                    cJSON_AddNumberToObject(props, "total_voltage", atof(num_buffer));
-                    
-                    cJSON_AddBoolToObject(props, "Switch", false);
-                    
-                    // 添加电池电压数组，每个电压值限制为小数点后两位
-                    cJSON *cell_array = cJSON_CreateArray();
-                    for (int c = 0; c < 12; c++) {
-                        // 格式化单体电压，限制为小数点后两位
-                        snprintf(num_buffer, sizeof(num_buffer), "%.4f", g_env_msg[idx].cell_voltages[c]/10000.0f);
-                        cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(atof(num_buffer)));
-                    }
-                    cJSON_AddItemToObject(props, "cell_voltages", cell_array);
-                    
-                    // 组装JSON
-                    cJSON_AddItemToObject(service, "properties", props);
-                    cJSON_AddItemToArray(services, service);
-                    cJSON_AddItemToObject(device, "services", services);
-                    cJSON_AddItemToArray(devices, device);
-                }
-            }
             
+            // 遍历所有活跃设备
+        for (int i = 2; i < 12; i++) {
+            if (is_device_active[i]) {
+                // 使用相同的索引
+                environment_msg *env = &g_env_msg[i];
+                
+                // 创建单个设备的JSON
+                cJSON *device = cJSON_CreateObject();
+                // 使用设备ID
+                char device_id[50];
+                snprintf(device_id, sizeof(device_id), "_Battery%02d", i);
+                cJSON_AddStringToObject(device, "device_id", device_id);
+                
+                cJSON *services = cJSON_CreateArray();
+                cJSON *service = cJSON_CreateObject();
+                cJSON_AddStringToObject(service, "service_id", "ws63");
+                
+                cJSON *props = cJSON_CreateObject();
+                
+                // 添加温度数组
+                cJSON *temp_array = cJSON_CreateArray();
+                char temp_buffer[16];
+                for (int t = 0; t < 5; t++) {
+                    snprintf(temp_buffer, sizeof(temp_buffer), "%.2f", g_env_msg[i].temperature[t]/1000.0f);
+                    cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(atof(temp_buffer)));
+                }
+                cJSON_AddItemToObject(props, "temperature", temp_array);
+                
+                // 添加其他属性
+                // 使用格式化方式限制小数点后两位
+                char num_buffer[16];
+                // 格式化电流，限制为小数点后两位
+                snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].current/10000.0f);
+                cJSON_AddNumberToObject(props, "current", atof(num_buffer));
+                
+                // 格式化总电压，限制为小数点后两位
+                snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].total_voltage/10000.0f);
+                cJSON_AddNumberToObject(props, "total_voltage", atof(num_buffer));
+                
+                
+                cJSON_AddNumberToObject(props, "SOC", g_env_msg[i].soc);
+                cJSON_AddNumberToObject(props, "iswifi", current_net);
+                
+                // 添加电池电压数组，每个电压值限制为小数点后两位
+                cJSON *cell_array = cJSON_CreateArray();
+                for (int c = 0; c < 12; c++) {
+                    // 格式化单体电压，限制为小数点后两位
+                    snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].cell_voltages[c]/10000.0f);
+                    cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(atof(num_buffer)));
+                }
+                cJSON_AddItemToObject(props, "cell_voltages", cell_array);
+                
+                // 组装JSON
+                cJSON_AddItemToObject(service, "properties", props);
+                cJSON_AddItemToArray(services, service);
+                cJSON_AddItemToObject(device, "services", services);
+                cJSON_AddItemToArray(devices, device);
+            }
+        }
+
             cJSON_AddItemToObject(root, "devices", devices);
             char *json_str = cJSON_PrintUnformatted(root);
             
             // 发送JSON数据到串口屏
             uart_send_buff((uint8_t *)json_str, strlen(json_str));
-            printf("串口发送BMS数据成功,活跃设备数量:%d\r\n", active_count);
+            printf("monitor:%s\r\n", json_str);
                 
             cJSON_free(json_str);
         
@@ -162,9 +170,18 @@ static void *monitorTX_task(char *arg)
             // 释放资源
             cJSON_Delete(root);
         } else {
-            printf("串口任务跳过数据上报:无活跃BMS设备连接\r\n");
+            printf("bms null\r\n");
         }
-        
+
+        static int loop_counter = 0;
+        loop_counter++;
+        if (loop_counter % 5 == 0) {
+            for (int i = 2; i < 12; i++) {
+                is_device_active[i] = false;
+            }
+            osal_msleep(500);
+            loop_counter = 0; // 重置计数器
+        }
         osal_msleep(1000); // 每隔1秒发送一次数据
     }
     return NULL;

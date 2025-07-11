@@ -60,7 +60,7 @@
      uint16_t conn_id;           // 设备ID
      uint8_t device_index;       // g_env_msg中的设备索引
      bool is_active;             // 设备是否活跃
-     uint8_t device_mac[6];      // 设备MAC地址
+     uint8_t mac[6];      // 设备MAC地址
      char cloud_device_id[64];   // 设备ID (如 "680b91649314d11851158e8d_Battery05")
  } bms_device_map_t;
  

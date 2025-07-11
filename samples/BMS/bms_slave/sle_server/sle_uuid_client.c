@@ -200,14 +200,18 @@
      } else if (conn_state == SLE_ACB_STATE_DISCONNECTED) {
          osal_printk("%s Disconnected from conn_id %u, reason: 0x%x\r\n", SLE_CLIENT_LOG, conn_id, disc_reason);
          remove_child_node_by_conn_id(conn_id);
-         
          // 从远程服务器地址列表中移除
          remove_remote_server_addr(addr);
+
+        if (g_active_children_count < MAX_CHILDREN) {
+            if(hybrid_node_get_role() != NODE_ROLE_ORPHAN) {
+                // 如果当前是孤儿节点，重新开始扫描
+                sle_start_scan();
+            } 
+        }
+         
      }
-     
-     if (g_active_children_count < MAX_CHILDREN) {
-         sle_start_scan();
-     }
+    
  }
  
  void sle_client_exchange_info_cbk(uint8_t client_id, uint16_t conn_id, ssap_exchange_info_t *param,
@@ -224,7 +228,8 @@
          };
          ssapc_find_structure(g_client_id, conn_id, &find_param);
      } else {
-         sle_disconnect_remote_device(conn_id);
+        //  sle_disconnect_remote_device(conn_id);
+        printf("disconnect all remote device\r\n");
      }
  }
  
@@ -268,6 +273,9 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
  static void sle_client_write_cfm_cb(uint8_t client_id, uint16_t conn_id,
                                       ssapc_write_result_t *write_result, errcode_t status)
  {
+    if (g_active_children_count < MAX_CHILDREN) {
+            sle_start_scan();
+    }
      osal_printk("%s Adoption write confirm, conn_id:%u, status:%d\r\n", SLE_CLIENT_LOG, conn_id, status);
  }
  
@@ -461,24 +469,17 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
      if (g_active_children_count == 0) {
          return;
      }
- 
-     uint16_t conn_ids_to_disconnect[MAX_CHILDREN];
-     uint8_t count_to_disconnect = 0;
- 
-     // 1. 先遍历整个数组，将所有活跃的连接ID收集到一个临时列表中
-     for (int i = 0; i < MAX_CHILDREN; i++) {
-         if (g_child_nodes[i].is_active && g_child_nodes[i].conn_id != 0) {
-             if (count_to_disconnect < MAX_CHILDREN) {
-                 conn_ids_to_disconnect[count_to_disconnect++] = g_child_nodes[i].conn_id;
-             }
-         }
-     }
- 
-     // 2. 遍历临时列表，安全地发起断开连接的请求
-     for (uint8_t i = 0; i < count_to_disconnect; i++) {
-         osal_printk("Issuing disconnect for conn_id: %u\r\n", conn_ids_to_disconnect[i]);
-         sle_disconnect_remote_device(conn_ids_to_disconnect[i]);
-     }
+
+    // 获取远程服务器地址并进行判断连接类型
+    sle_addr_t *remote_server_addrs = sle_get_remote_server_addrs();
+    uint8_t remote_server_count = sle_get_remote_server_count();
+
+    for (uint8_t i = 0; i < remote_server_count; i++)
+    {
+        sle_disconnect_remote_device(&remote_server_addrs[i]); // 遍历所有子节点，断开连接
+    }
+
+         
  }
  
  

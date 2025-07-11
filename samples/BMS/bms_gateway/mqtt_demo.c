@@ -67,10 +67,7 @@ volatile MQTT_msg g_cmd_msg;        // 全局命令消息变量
 volatile int g_cmd_msg_flag = 0;    // 命令消息标志
 extern int wifi_msg_flag; // WiFi配置修改标志
 
-// 最大支持的BMS设备数
-#define MAX_BMS_DEVICES 8
 
-extern bms_device_map_t g_bms_device_map[MAX_BMS_DEVICES];
 volatile environment_msg g_env_msg[MAX_BMS_DEVICES];
 
 
@@ -130,6 +127,7 @@ void connlost(void *context, char *cause)
     printf("mqtt_connection_lost() error, cause: %s\n", cause);
 }
 
+extern bool is_device_active[12]; // 设备活跃状态数组
 // ======================== MQTT操作函数 ========================
 int mqtt_publish_multi_device(const char *topic)
 {
@@ -139,13 +137,17 @@ int mqtt_publish_multi_device(const char *topic)
     cJSON *devices = cJSON_CreateArray();
     
     // 遍历所有活跃设备
-    for (int i = 0; i < MAX_BMS_DEVICES; i++) {
-        if (g_bms_device_map[i].is_active) {
-            int idx = g_bms_device_map[i].device_index;
+    for (int i = 2; i < 12; i++) {
+        if (is_device_active[i]) {
+            // 使用相同的索引
+            environment_msg *env = &g_env_msg[i];
             
             // 创建单个设备的JSON
             cJSON *device = cJSON_CreateObject();
-            cJSON_AddStringToObject(device, "device_id", g_bms_device_map[i].cloud_device_id);
+            // 使用设备ID
+            char device_id[50];
+            snprintf(device_id, sizeof(device_id), "680b91649314d11851158e8d_Battery%02d", i);
+            cJSON_AddStringToObject(device, "device_id", device_id);
             
             cJSON *services = cJSON_CreateArray();
             cJSON *service = cJSON_CreateObject();
@@ -156,19 +158,19 @@ int mqtt_publish_multi_device(const char *topic)
             // 添加温度数组
             cJSON *temp_array = cJSON_CreateArray();
             for (int t = 0; t < 5; t++) {
-                cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(g_env_msg[idx].temperature[t]));
+                cJSON_AddItemToArray(temp_array, cJSON_CreateNumber(g_env_msg[i].temperature[t]));
             }
             cJSON_AddItemToObject(props, "temperature", temp_array);
             
             // 添加其他属性，确保格式与华为云期望的完全一致
-            cJSON_AddNumberToObject(props, "current", g_env_msg[idx].current);
-            cJSON_AddNumberToObject(props, "total_voltage", g_env_msg[idx].total_voltage);
-            cJSON_AddBoolToObject(props, "Switch", false);
+            cJSON_AddNumberToObject(props, "current", g_env_msg[i].current);
+            cJSON_AddNumberToObject(props, "total_voltage", g_env_msg[i].total_voltage);
+            cJSON_AddNumberToObject(props, "SOC", g_env_msg[i].soc);
             
             // 添加电池电压数组
             cJSON *cell_array = cJSON_CreateArray();
             for (int c = 0; c < 12; c++) {
-                cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(g_env_msg[idx].cell_voltages[c]));
+                cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(g_env_msg[i].cell_voltages[c]));
             }
             cJSON_AddItemToObject(props, "cell_voltages", cell_array);
             
@@ -196,6 +198,8 @@ int mqtt_publish_multi_device(const char *topic)
         printf("发布多设备数据失败，错误码：%d\n", rc);
     }
     
+
+
     // 释放资源
     cJSON_Delete(root);
     free(json_str);
@@ -256,7 +260,7 @@ int mqtt_connect(void)
 
 // ======================== 网络切换流程 ========================
 
-static net_type_t current_net = NET_TYPE_WIFI;
+net_type_t current_net = NET_TYPE_WIFI;
 
 // 切换到WiFi
 int switch_to_wifi(const char *ssid, const char *psk)
@@ -404,6 +408,8 @@ int mqtt_task(void)
                 }
             }
         }
+
+        
         
         // 根据当前网络类型选择上报方式
         if (current_net == NET_TYPE_WIFI) {
@@ -433,9 +439,8 @@ int mqtt_task(void)
                 int published_count = 0;
                 
                 // 遍历所有活跃设备，单独上报每个设备（保持网关格式）
-                for (int i = 0; i < MAX_BMS_DEVICES; i++) {
-                    if (g_bms_device_map[i].is_active) {
-                        int idx = g_bms_device_map[i].device_index;
+                for (int i = 0; i < 12; i++) {
+                    if (is_device_active[i]) {
                         
                         // 使用sprintf构建网关格式的JSON字符串
                         static char json_buffer[512]; // 单设备JSON缓冲区，足够容纳一个设备的数据
@@ -443,41 +448,41 @@ int mqtt_task(void)
                         
                         // 构建温度数组字符串
                         snprintf(temp_str, sizeof(temp_str), "[%.1f,%.1f,%.1f,%.1f,%.1f]",
-                                g_env_msg[idx].temperature[0], g_env_msg[idx].temperature[1],
-                                g_env_msg[idx].temperature[2], g_env_msg[idx].temperature[3],
-                                g_env_msg[idx].temperature[4]);
+                                g_env_msg[i].temperature[0], g_env_msg[i].temperature[1],
+                                g_env_msg[i].temperature[2], g_env_msg[i].temperature[3],
+                                g_env_msg[i].temperature[4]);
                         
                         // 构建电池电压数组字符串
                         snprintf(cell_str, sizeof(cell_str), 
                                 "[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f]",
-                                g_env_msg[idx].cell_voltages[0], g_env_msg[idx].cell_voltages[1],
-                                g_env_msg[idx].cell_voltages[2], g_env_msg[idx].cell_voltages[3],
-                                g_env_msg[idx].cell_voltages[4], g_env_msg[idx].cell_voltages[5],
-                                g_env_msg[idx].cell_voltages[6], g_env_msg[idx].cell_voltages[7],
-                                g_env_msg[idx].cell_voltages[8], g_env_msg[idx].cell_voltages[9],
-                                g_env_msg[idx].cell_voltages[10], g_env_msg[idx].cell_voltages[11]);
+                                g_env_msg[i].cell_voltages[0], g_env_msg[i].cell_voltages[1],
+                                g_env_msg[i].cell_voltages[2], g_env_msg[i].cell_voltages[3],
+                                g_env_msg[i].cell_voltages[4], g_env_msg[i].cell_voltages[5],
+                                g_env_msg[i].cell_voltages[6], g_env_msg[i].cell_voltages[7],
+                                g_env_msg[i].cell_voltages[8], g_env_msg[i].cell_voltages[9],
+                                g_env_msg[i].cell_voltages[10], g_env_msg[i].cell_voltages[11]);
                         
                         // 构建完整的网关格式JSON
                         snprintf(json_buffer, sizeof(json_buffer),
-                                "{\"devices\":[{\"device_id\":\"%s\",\"services\":[{\"service_id\":\"ws63\","
+                                "{\"devices\":[{\"device_id\":\"680b91649314d11851158e8d_Battery%02d\",\"services\":[{\"service_id\":\"ws63\","
                                 "\"properties\":{\"temperature\":%s,\"current\":%.2f,\"total_voltage\":%.2f,"
-                                "\"Switch\":false,\"cell_voltages\":%s}}]}]}",
-                                g_bms_device_map[i].cloud_device_id, temp_str, 
-                                g_env_msg[idx].current, g_env_msg[idx].total_voltage, cell_str);
+                                "\"SOC\":%d,\"cell_voltages\":%s}}]}]}",
+                                i, temp_str, 
+                                g_env_msg[i].current, g_env_msg[i].total_voltage, g_env_msg[i].soc, cell_str);
                         
                         char *json_str = json_buffer;
                         
-                        printf("[4G] Publishing gateway device %s", g_bms_device_map[i].cloud_device_id);
+                        printf("[4G] Publishing gateway device 680b91649314d11851158e8d_Battery%02d", i);
                         
                         if (gate_report_topic && json_str) {
                             L610_HuaweiCloudReport(gate_report_topic, json_str);
                             published_count++;
-                            printf("[L610] 网关设备 %s 4G上报成功\r\n", g_bms_device_map[i].cloud_device_id);
+                            printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d 4G上报成功\r\n", i);
                             
                             // 设备间上报延时，避免L610模块负载过大
                             osal_msleep(200);
                         } else {
-                            printf("[L610] 网关设备 %s JSON生成或发送失败\r\n", g_bms_device_map[i].cloud_device_id);
+                            printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d JSON生成或发送失败\r\n", i);
                         }
                     }
                 }

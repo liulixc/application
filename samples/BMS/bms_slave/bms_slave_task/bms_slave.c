@@ -1147,7 +1147,7 @@ void *bms_salve_task(void)
         osal_mdelay(10);
         adc_port_read(adc_channel, &voltage);
          printf("ADC Voltage:%d \r\n",voltage);
-        Current = (5.0/5.0*voltage/1000-2.5)/66.7*1000*10000;
+        Current = (5.0/5.2*voltage/1000-2.5)/66.7*1000*10000;
         osal_printk("Current: %d\r\n", Current);
 
         for(int i = 0; i < 12; i++)//过压欠压告警
@@ -1155,19 +1155,16 @@ void *bms_salve_task(void)
             if((int)cell_codes[0][i] > 42000)
             {
                 printf("OVER VOLTAGE! STOP Charging!\r\n");
-                osal_mdelay(10);
             }
             if((int)cell_codes[0][i] < 32400)
             {
                 printf("LOW VOLTAGE! Charge Please!\r\n");
-                osal_mdelay(10);
             }
             if((int)cell_codes[0][i] > 45000)//电压异常断电
             {
                 uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
                 uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
                 printf("Abnormal Voltage! Power has been cut off!\r\n");
-                osal_mdelay(10);
             }
         }
 
@@ -1178,7 +1175,6 @@ void *bms_salve_task(void)
                 uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
                 uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
                 printf("OVER Temperature! Power has been cut off!\r\n");
-                osal_mdelay(10);
             }
         }
 
@@ -1221,17 +1217,17 @@ void *bms_salve_task(void)
         (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02x:%02x:%02x:%02x:%02x:%02x",
                  local_addr->addr[0], local_addr->addr[1], local_addr->addr[2],
                  local_addr->addr[3], local_addr->addr[4], local_addr->addr[5]);
-        cJSON_AddStringToObject(root, "origin_mac", mac_str);
+        cJSON_AddStringToObject(root, "mac", mac_str);
 
         cJSON_AddNumberToObject(root, "total", MOD_VOL);
         cJSON_AddItemToObject(root, "cell", cell_voltages);
-        cJSON_AddItemToObject(root, "temperature", temperatures);
+        cJSON_AddItemToObject(root, "T", temperatures);
         cJSON_AddNumberToObject(root, "current", Current); 
         cJSON_AddNumberToObject(root, "SOC", Get_SOC()); // 300mV 压差均衡开关
         
         // 打印格式JSON
         char *json_str = cJSON_Print(root);
-        printf("BMS_JSON:%s\n", json_str);
+        // printf("BMS_JSON:%s\n", json_str);
         
         if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
             osal_printk("Member node sending its own JSON data...\r\n");
@@ -1243,22 +1239,22 @@ void *bms_salve_task(void)
         cJSON_Delete(root);
         free(json_str);
         
-        osal_mdelay(1000); // 适当延长发送间隔
+        osal_mdelay(200); // 适当延长发送间隔
     }
     return 0;
 }
 
-static void bms_slave_entry(void)
-{
-    osal_task *task_handle = NULL;
-    osal_kthread_lock();
-    task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
-    if (task_handle != NULL) {
-        osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
-        osal_kfree(task_handle);
-    }
-    osal_kthread_unlock();
-}
+// static void bms_slave_entry(void)
+// {
+//     osal_task *task_handle = NULL;
+//     osal_kthread_lock();
+//     task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
+//     if (task_handle != NULL) {
+//         osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
+//         osal_kfree(task_handle);
+//     }
+//     osal_kthread_unlock();
+// }
 
-/* Run the bms_salve_entry. */
-app_run(bms_slave_entry);
+// /* Run the bms_salve_entry. */
+// app_run(bms_slave_entry);

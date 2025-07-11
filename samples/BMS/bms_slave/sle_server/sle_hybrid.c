@@ -72,7 +72,6 @@ void hybrid_node_init(void)
     sle_hybridc_init();
     uapi_pin_set_mode(2, PIN_MODE_0);
     uapi_gpio_set_dir(2, GPIO_DIRECTION_OUTPUT);
-    sle_update_adv_data();
 }
 
 /**
@@ -120,8 +119,9 @@ void hybrid_node_revert_to_orphan(void)
     g_network_status.level = 0;
     g_network_status.parent_conn_id = 0;
 
-    // 重新开始作为孤儿进行广播
-    sle_update_adv_data();
+
+    // 重新启动广播
+    sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
     g_is_reverting = false;
 }
 
@@ -144,7 +144,7 @@ void sle_hybrid_task(char *arg)
     // local_address.addr[2]=0x33;
     // local_address.addr[3]=0x44;
     // local_address.addr[4]=0x55;
-    // local_address.addr[5]=0x01;
+    // local_address.addr[5]=0x05;
     (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
     g_local_addr.type = local_address.type;
     sle_set_local_addr(&g_local_addr);
@@ -156,6 +156,9 @@ void sle_hybrid_task(char *arg)
     // 2. 注册SLE通用回调函数
     sle_register_common_cbks();
 
+    // 5. 初始化节点为孤儿状态
+    hybrid_node_init();
+    
     // 3. 启用SLE服务
     ret = enable_sle();
     if (ret != 0)
@@ -165,9 +168,6 @@ void sle_hybrid_task(char *arg)
     }
     osal_printk("enable_sle succ\r\n");
 
-    // 5. 初始化节点为孤儿状态
-    hybrid_node_init();
-    
     // 7. 主循环，可以根据节点状态执行不同的逻辑
     while (1) {
         // 例如，可以周期性地打印当前网络状态

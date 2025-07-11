@@ -17,6 +17,7 @@ typedef struct {
     float current;
     float cell_voltages[12]; // 单体电压
     float total_voltage; // 总电压
+    uint8_t soc; // 电池SOC
 } MQTT_msg;
 
 typedef struct {
@@ -24,5 +25,6 @@ typedef struct {
     float current;     // 电流
     float cell_voltages[12]; // 单体电压
     float total_voltage; // 总电压
+    uint8_t soc; // 电池SOC
 } environment_msg;
 #endif
