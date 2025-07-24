@@ -104,7 +104,7 @@
      ssaps_callbacks_t ssaps_cbk = {0};
      ssaps_cbk.read_request_cb = ssaps_read_request_cbk;            
      ssaps_cbk.write_request_cb = ssaps_write_request_cbk;          
-     ret = SsapsRegisterCallbacks(&ssaps_cbk);                    
+     ret = ssaps_register_callbacks(&ssaps_cbk);                    
      if (ret != ERRCODE_SLE_SUCCESS)
      {
          printf("%s [sle_ssaps_register_cbks] ssaps_register_callbacks fail :%x\r\n", SLE_SERVER_LOG,

@@ -450,7 +450,7 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
          .data_len = sizeof(cmd),
          .data = (uint8_t *)&cmd,
      };
-     errcode_t ret = SsapWriteReq(g_client_id, conn_id, &param);
+     errcode_t ret = ssapc_write_req(g_client_id, conn_id, &param);
      if (ret != ERRCODE_SUCC) {
          osal_printk("%s Failed to send adoption command: %d\r\n", SLE_CLIENT_LOG, ret);
      } else {
