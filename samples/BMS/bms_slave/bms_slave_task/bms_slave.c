@@ -30,6 +30,7 @@
 #include "adc_porting.h"
 #include "sle_uuid_server.h"
 #include "sle_hybrid.h"
+#include "sle_uuid_client.h"
  #include "gpio.h"     // GPIO 操作相关头文件
 
 #define SPI_SLAVE_NUM 1
@@ -968,10 +969,10 @@ void  Balance_task(uint16_t mv)    //计算哪个电池需要均衡
 
 
 int MOD_VOL = 0;
-
-uint8_t Get_SOC(void)
+int SOC = 0;
+void Get_SOC(void)
 {
-    int SOC = 0;
+    
 
     //cell_codes[12] = MOD_VOL;
 
@@ -1081,11 +1082,10 @@ uint8_t Get_SOC(void)
 
     //osal_mdelay(10);
 
-    return SOC;
 }
 
 
-float LTC6804_Calculate_Temperature(float adc_value) {
+uint16_t LTC6804_Calculate_Temperature(float adc_value) {
   float Rt =(100*adc_value)/(30000-adc_value);  //某温度下Rt的值
 //	printf("Rt%f\r\n",Rt);
 	float temp1=log(Rt/100);
@@ -1122,7 +1122,7 @@ void *bms_salve_task(void)
     LTC6804_initialize();//通讯正常
     printf("\r\n");
     osal_mdelay(10);
-    int Current = 0.0f;
+    int Current = 0;
     
 
     while (1) {
@@ -1147,24 +1147,24 @@ void *bms_salve_task(void)
         osal_mdelay(10);
         adc_port_read(adc_channel, &voltage);
          printf("ADC Voltage:%d \r\n",voltage);
-        Current = (5.0/5.2*voltage/1000-2.5)/66.7*1000*10000;
+        Current = (voltage-2500)*50;
         osal_printk("Current: %d\r\n", Current);
 
         for(int i = 0; i < 12; i++)//过压欠压告警
         {
             if((int)cell_codes[0][i] > 42000)
             {
-                printf("OVER VOLTAGE! STOP Charging!\r\n");
+                // printf("OVER VOLTAGE! STOP Charging!\r\n");
             }
             if((int)cell_codes[0][i] < 32400)
             {
-                printf("LOW VOLTAGE! Charge Please!\r\n");
+                // printf("LOW VOLTAGE! Charge Please!\r\n");
             }
             if((int)cell_codes[0][i] > 45000)//电压异常断电
             {
                 uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
                 uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
-                printf("Abnormal Voltage! Power has been cut off!\r\n");
+                // printf("Abnormal Voltage! Power has been cut off!\r\n");
             }
         }
 
@@ -1174,7 +1174,7 @@ void *bms_salve_task(void)
             {
                 uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
                 uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
-                printf("OVER Temperature! Power has been cut off!\r\n");
+                // printf("OVER Temperature! Power has been cut off!\r\n");
             }
         }
 
@@ -1206,7 +1206,7 @@ void *bms_salve_task(void)
         // 构建 temperatures 数组
         cJSON *temperatures = cJSON_CreateArray();
         for (int i = 0; i < 5; i++) {
-            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber((int)LTC6804_Calculate_Temperature((int)gpiocode[0][i])));
+            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(LTC6804_Calculate_Temperature(gpiocode[0][i])));
         }
         // 构建根对象
         cJSON *root = cJSON_CreateObject();
@@ -1223,7 +1223,10 @@ void *bms_salve_task(void)
         cJSON_AddItemToObject(root, "cell", cell_voltages);
         cJSON_AddItemToObject(root, "T", temperatures);
         cJSON_AddNumberToObject(root, "current", Current); 
-        cJSON_AddNumberToObject(root, "SOC", Get_SOC()); // 300mV 压差均衡开关
+        cJSON_AddNumberToObject(root, "SOC", SOC); // 300mV 压差均衡开关
+        cJSON_AddNumberToObject(root, "level", hybrid_node_get_level()); // 节点层级
+        cJSON_AddNumberToObject(root, "child", get_active_children_count()); // 子节点数量
+
         
         // 打印格式JSON
         char *json_str = cJSON_Print(root);

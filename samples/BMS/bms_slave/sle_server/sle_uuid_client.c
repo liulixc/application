@@ -203,11 +203,14 @@
          // 从远程服务器地址列表中移除
          remove_remote_server_addr(addr);
 
-        if (g_active_children_count < MAX_CHILDREN) {
-            if(hybrid_node_get_role() != NODE_ROLE_ORPHAN) {
-                // 如果当前是孤儿节点，重新开始扫描
-                sle_start_scan();
-            } 
+        // 仅当当前节点是稳定的成员节点并且未处于恢复孤儿状态时，才重新开始扫描
+        if (g_active_children_count < MAX_CHILDREN && 
+            hybrid_node_get_role() == NODE_ROLE_MEMBER && 
+            !hybrid_node_is_reverting_to_orphan()) {
+            osal_printk("%s Stable member node, restarting scan.\r\n", SLE_CLIENT_LOG);
+            sle_start_scan();
+        } else {
+            osal_printk("%s Not restarting scan, node state not suitable.\r\n", SLE_CLIENT_LOG);
         }
          
      }

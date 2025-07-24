@@ -21,7 +21,6 @@
 typedef struct {
     node_role_t role;
     uint8_t level;
-    uint16_t parent_conn_id;
 } node_network_status_t;
 
 static node_network_status_t g_network_status;
@@ -47,10 +46,7 @@ uint8_t hybrid_node_get_level(void)
     return g_network_status.level;
 }
 
-uint16_t hybrid_node_get_parent_conn_id(void)
-{
-    return g_network_status.parent_conn_id;
-}
+
 
 bool hybrid_node_is_reverting_to_orphan(void)
 {
@@ -64,7 +60,6 @@ void hybrid_node_init(void)
 {
     g_network_status.role = NODE_ROLE_ORPHAN;
     g_network_status.level = 0; // 孤儿节点的初始层级设为0
-    g_network_status.parent_conn_id = 0;
     osal_printk("Node initialized as ORPHAN, level %d\r\n", g_network_status.level);
     
     // 作为孤儿，只需要启动服务端功能并开始广播
@@ -76,18 +71,16 @@ void hybrid_node_init(void)
 
 /**
  * @brief 节点转变为成员
- * @param parent_conn_id 父节点的连接ID
  * @param parent_level 父节点的网络层级
  */
-void hybrid_node_become_member(uint16_t parent_conn_id, uint8_t parent_level)
+void hybrid_node_become_member(uint8_t parent_level)
 {
     if (g_network_status.role == NODE_ROLE_MEMBER) {
         return; // 已经是成员，无需转换
     }
     g_network_status.role = NODE_ROLE_MEMBER;
     g_network_status.level = parent_level + 1;
-    g_network_status.parent_conn_id = parent_conn_id;
-    osal_printk("Node becomes MEMBER, level %d, parent_conn_id %d\r\n", g_network_status.level, parent_conn_id);
+    osal_printk("Node becomes MEMBER, level %d\r\n", g_network_status.level);
 
     uapi_gpio_set_val(2, GPIO_LEVEL_HIGH); // 设置GPIO引脚高电平，表示已连接
     // 作为成员，需要启动客户端功能去寻找自己的子节点
@@ -117,12 +110,18 @@ void hybrid_node_revert_to_orphan(void)
     // 重置网络状态
     g_network_status.role = NODE_ROLE_ORPHAN;
     g_network_status.level = 0;
-    g_network_status.parent_conn_id = 0;
 
+
+    // 添加延迟，确保网络拓扑稳定
+    osal_printk("Waiting for network to stabilize...\r\n");
+    osal_msleep(2000); // 等待2秒钟
 
     // 重新启动广播
     sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
+    
+    // 清除恢复状态标志
     g_is_reverting = false;
+    osal_printk("Node reverted to ORPHAN, now advertising\r\n");
 }
 
 /**
@@ -172,21 +171,12 @@ void sle_hybrid_task(char *arg)
     while (1) {
         // 例如，可以周期性地打印当前网络状态
         osal_msleep(5000);
-        osal_printk("Current role: %d, level: %d, parent_id: %d, children: %d\r\n",
+        osal_printk("Current role: %d, level: %d, children: %d\r\n",
                     g_network_status.role,
                     g_network_status.level,
-                    g_network_status.parent_conn_id,
                     get_active_children_count());
                      // 作为成员节点，且有父节点连接时，上报自己的数据
                      
-        // if (g_network_status.role == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
-        //     msg_data_t data_to_report;
-        //     data_to_report.value = report_counter++;
-        //     (void)memcpy_s(data_to_report.origin_mac, SLE_ADDR_LEN, g_local_addr.addr, SLE_ADDR_LEN);
-
-        //     osal_printk("Member node sending its own data, count: %u\r\n", data_to_report.data);
-        //     sle_hybrids_send_data((uint8_t*)&data_to_report, sizeof(report_data_t));
-        // }
     }
 }
 

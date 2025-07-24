@@ -1,30 +1,32 @@
 #ifndef MQTT_DEMO_H
 #define MQTT_DEMO_H
 
-// ÍøÂçÀàĞÍÃ¶¾Ù¶¨Òå
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ã¶ï¿½Ù¶ï¿½ï¿½ï¿½
 typedef enum {
     NET_TYPE_4G,
     NET_TYPE_WIFI,
     NET_TYPE_NONE
 } net_type_t;
 
-// ×î´óÖ§³ÖµÄBMSÉè±¸Êı
-#define MAX_BMS_DEVICES 32 // Ê÷×´ÍøÂçÏÂ£¬Ôö¼ÓÍø¹Ø¿É¹ÜÀíµÄ×ÜÉè±¸Êı
+// ï¿½ï¿½ï¿½Ö§ï¿½Öµï¿½BMSï¿½è±¸ï¿½ï¿½
+#define MAX_BMS_DEVICES 32 // ï¿½ï¿½×´ï¿½ï¿½ï¿½ï¿½ï¿½Â£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¿É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½è±¸ï¿½ï¿½
 
 typedef struct {
     char receive_payload[256];
     float temperature[5];
     float current;
-    float cell_voltages[12]; // µ¥ÌåµçÑ¹
-    float total_voltage; // ×ÜµçÑ¹
-    uint8_t soc; // µç³ØSOC
+    float cell_voltages[12]; // ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¹
+    float total_voltage; // ï¿½Üµï¿½Ñ¹
+    uint8_t soc; // ï¿½ï¿½ï¿½SOC
 } MQTT_msg;
 
 typedef struct {
-    float temperature[5]; // ÎÂ¶È
-    float current;     // µçÁ÷
-    float cell_voltages[12]; // µ¥ÌåµçÑ¹
-    float total_voltage; // ×ÜµçÑ¹
-    uint8_t soc; // µç³ØSOC
+    float temperature[5]; // ï¿½Â¶ï¿½
+    float current;     // ï¿½ï¿½ï¿½ï¿½
+    float cell_voltages[12]; // ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¹
+    float total_voltage; // ï¿½Üµï¿½Ñ¹
+    uint8_t soc; // ï¿½ï¿½ï¿½SOC
+    uint8_t level; // èŠ‚ç‚¹å±‚çº§
+    uint8_t child; // å­èŠ‚ç‚¹æ•°é‡
 } environment_msg;
 #endif

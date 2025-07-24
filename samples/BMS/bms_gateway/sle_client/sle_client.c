@@ -349,76 +349,152 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
                              errcode_t status)
 {
     (void)client_id;
-    (void)status;
-
-    if (status != ERRCODE_SUCC || data == NULL || data->data == NULL) {
-        osal_printk("%s Notification error or empty data. conn_id:%u, status:%d\r\n", SLE_GATEWAY_LOG, conn_id, status);
+    
+    // 基本参数检查
+    if (status != ERRCODE_SUCC) {
+        osal_printk("%s Notification failed. conn_id:%u, status:%d\r\n", SLE_GATEWAY_LOG, conn_id, status);
         return;
     }
-    // 确保字符串正确终止
-    data->data[data->data_len] = '\0';
-    cJSON *root = cJSON_Parse((char *)data->data);
+    
+    if (data == NULL || data->data == NULL || data->data_len == 0) {
+        osal_printk("%s Invalid notification data. conn_id:%u\r\n", SLE_GATEWAY_LOG, conn_id);
+        return;
+    }
+    
+    // 数据长度安全检查，防止缓冲区溢出
+    if (data->data_len >= 512) { // 假设最大缓冲区为512字节
+        osal_printk("%s Data too large: %u bytes. conn_id:%u\r\n", SLE_GATEWAY_LOG, data->data_len, conn_id);
+        return;
+    }
+    
+    // 创建安全的字符串副本
+    char json_buffer[513] = {0}; // 512 + 1 for null terminator
+    memcpy(json_buffer, data->data, data->data_len);
+    json_buffer[data->data_len] = '\0';
+    
+    osal_printk("%s Received JSON from conn_id %u: %s\r\n", SLE_GATEWAY_LOG, conn_id, json_buffer);
+    
+    // 解析JSON
+    cJSON *root = cJSON_Parse(json_buffer);
     if (root == NULL) {
-        osal_printk("%s Failed to parse JSON from conn_id %u\r\n", SLE_GATEWAY_LOG, conn_id);
+        const char *error_ptr = cJSON_GetErrorPtr();
+        osal_printk("%s JSON parse error from conn_id %u: %s\r\n", SLE_GATEWAY_LOG, conn_id, 
+                   error_ptr ? error_ptr : "Unknown error");
         return;
     }
-
-    cJSON *mac = cJSON_GetObjectItem(root, "mac");
-    if (!cJSON_IsString(mac) || !mac->valuestring) {
-        osal_printk("%s MAC地址无效或为空\r\n", SLE_GATEWAY_LOG);
+    
+    // 解析MAC地址
+    cJSON *mac_json = cJSON_GetObjectItem(root, "mac");
+    if (!cJSON_IsString(mac_json) || mac_json->valuestring == NULL) {
+        osal_printk("%s Missing or invalid MAC address from conn_id %u\r\n", SLE_GATEWAY_LOG, conn_id);
         cJSON_Delete(root);
         return;
     }
-
     
-    // 只获取MAC地址的后8位
-    uint8_t mac_last_byte;
-    char *mac_str = mac->valuestring;
-    sscanf(mac_str + 15, "%02hhx", &mac_last_byte); // 15 = (6-1)*3,直接定位到最后一个字节
-
-    is_device_active[mac_last_byte] = true;
-
-    // 数据直接存储到相同索引位置
-    environment_msg *env = &g_env_msg[mac_last_byte];
-    cJSON *total = cJSON_GetObjectItem(root, "total");
-    if (cJSON_IsNumber(total)) {
-        env->total_voltage = total->valueint;
+    char *mac_str = mac_json->valuestring;
+    size_t mac_len = strlen(mac_str);
+    
+    // 验证MAC地址格式 (应该是 XX:XX:XX:XX:XX:XX 格式，长度为17)
+    if (mac_len < 17) {
+        osal_printk("%s Invalid MAC address format: %s from conn_id %u\r\n", SLE_GATEWAY_LOG, mac_str, conn_id);
+        cJSON_Delete(root);
+        return;
     }
-
+    
+    // 安全地解析MAC地址的最后一个字节（从十六进制字符串转换为十进制数值）
+    uint8_t mac_last_byte = 0;
+    if (sscanf(mac_str + mac_len - 2, "%02hhx", &mac_last_byte) != 1) {
+        osal_printk("%s Failed to parse MAC address: %s from conn_id %u\r\n", SLE_GATEWAY_LOG, mac_str, conn_id);
+        cJSON_Delete(root);
+        return;
+    }
+    
+    // mac_last_byte现在存储的是十进制数值（例如："0A" -> 10）
+    
+    // 检查设备索引范围
+    if (mac_last_byte >= MAX_BMS_DEVICES) {
+        osal_printk("%s Device index %u out of range from conn_id %u\r\n", SLE_GATEWAY_LOG, mac_last_byte, conn_id);
+        cJSON_Delete(root);
+        return;
+    }
+    
+    // 标记设备为活跃状态
+    is_device_active[mac_last_byte] = true;
+    
+    // 获取环境消息结构体指针
+    environment_msg *env = &g_env_msg[mac_last_byte];
+    
+    // 清零当前设备的数据，确保数据一致性
+    memset(env, 0, sizeof(environment_msg));
+    
+    // 解析总电压
+    cJSON *total_voltage = cJSON_GetObjectItem(root, "total");
+    if (cJSON_IsNumber(total_voltage)) {
+        env->total_voltage = (float)total_voltage->valuedouble;
+    }
+    
+    // 解析电流
     cJSON *current = cJSON_GetObjectItem(root, "current");
     if (cJSON_IsNumber(current)) {
-        env->current = current->valueint;
-        if(mac_last_byte !=5) env->current = 0;
+        env->current = (float)current->valuedouble;
     }
     
+    // 解析SOC
     cJSON *soc = cJSON_GetObjectItem(root, "SOC");
     if (cJSON_IsNumber(soc)) {
-        env->soc = soc->valueint;
+        env->soc = (uint8_t)soc->valueint;
     }
-
+    
+    // 解析电池单体电压数组
     cJSON *cell_array = cJSON_GetObjectItem(root, "cell");
     if (cJSON_IsArray(cell_array)) {
         int cell_count = cJSON_GetArraySize(cell_array);
-        for (int i = 0; i < cell_count && i < 12; i++) {
+        int max_cells = (cell_count < 12) ? cell_count : 12;
+        
+        for (int i = 0; i < max_cells; i++) {
             cJSON *cell_item = cJSON_GetArrayItem(cell_array, i);
             if (cJSON_IsNumber(cell_item)) {
-                env->cell_voltages[i] = cell_item->valueint;
+                env->cell_voltages[i] = (float)cell_item->valuedouble;
             }
         }
     }
-
+    
+    // 解析温度数组
     cJSON *temp_array = cJSON_GetObjectItem(root, "T");
     if (cJSON_IsArray(temp_array)) {
         int temp_count = cJSON_GetArraySize(temp_array);
-        for (int i = 0; i < temp_count && i < 5; i++) {
+        int max_temps = (temp_count < 5) ? temp_count : 5;
+        
+        for (int i = 0; i < max_temps; i++) {
             cJSON *temp_item = cJSON_GetArrayItem(temp_array, i);
             if (cJSON_IsNumber(temp_item)) {
-                env->temperature[i] = temp_item->valueint;
+                env->temperature[i] = (float)temp_item->valuedouble;
             }
         }
     }
-
-
+    
+    // 解析节点层级
+    cJSON *level = cJSON_GetObjectItem(root, "level");
+    if (cJSON_IsNumber(level)) {
+        int level_val = level->valueint;
+        if (level_val >= 0 && level_val <= 255) {
+            env->level = (uint8_t)level_val;
+        }
+    }
+    
+    // 解析子节点数量
+    cJSON *child = cJSON_GetObjectItem(root, "child");
+    if (cJSON_IsNumber(child)) {
+        int child_val = child->valueint;
+        if (child_val >= 0 && child_val <= 255) {
+            env->child = (uint8_t)child_val;
+        }
+    }
+    
+    osal_printk("%s Successfully parsed data from device %u (conn_id:%u): level=%u, child=%u\r\n",
+                SLE_GATEWAY_LOG, mac_last_byte, conn_id, env->level, env->child);
+    
+    // 清理JSON对象
     cJSON_Delete(root);
 }
  

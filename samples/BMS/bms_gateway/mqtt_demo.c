@@ -174,6 +174,10 @@ int mqtt_publish_multi_device(const char *topic)
             }
             cJSON_AddItemToObject(props, "cell_voltages", cell_array);
             
+            // 添加节点层级和子节点数量
+            cJSON_AddNumberToObject(props, "level", g_env_msg[i].level);
+            cJSON_AddNumberToObject(props, "child", g_env_msg[i].child);
+            
             // 组装JSON
             cJSON_AddItemToObject(service, "properties", props);
             cJSON_AddItemToArray(services, service);
@@ -198,8 +202,6 @@ int mqtt_publish_multi_device(const char *topic)
         printf("发布多设备数据失败，错误码：%d\n", rc);
     }
     
-
-
     // 释放资源
     cJSON_Delete(root);
     free(json_str);
@@ -466,9 +468,10 @@ int mqtt_task(void)
                         snprintf(json_buffer, sizeof(json_buffer),
                                 "{\"devices\":[{\"device_id\":\"680b91649314d11851158e8d_Battery%02d\",\"services\":[{\"service_id\":\"ws63\","
                                 "\"properties\":{\"temperature\":%s,\"current\":%.2f,\"total_voltage\":%.2f,"
-                                "\"SOC\":%d,\"cell_voltages\":%s}}]}]}",
+                                "\"SOC\":%d,\"cell_voltages\":%s,\"level\":%d,\"child\":%d}}]}]}",
                                 i, temp_str, 
-                                g_env_msg[i].current, g_env_msg[i].total_voltage, g_env_msg[i].soc, cell_str);
+                                g_env_msg[i].current, g_env_msg[i].total_voltage, g_env_msg[i].soc, cell_str,
+                                g_env_msg[i].level, g_env_msg[i].child);
                         
                         char *json_str = json_buffer;
                         

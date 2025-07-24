@@ -285,7 +285,7 @@
          adoption_cmd_t *cmd = (adoption_cmd_t *)(write_cb_para->value);
          if (cmd->cmd == ADOPTION_CMD) {
              osal_printk("Adoption command received from conn_id: %d, parent_level: %d\r\n", conn_id, cmd->level);
-             hybrid_node_become_member(conn_id, cmd->level);
+             hybrid_node_become_member(cmd->level);
              return;
          }
      }
