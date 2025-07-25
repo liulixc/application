@@ -137,13 +137,13 @@ void sle_hybrid_task(char *arg)
     // 1. 设置并统一节点的MAC地址
     sle_addr_t local_address;
     local_address.type = SLE_ADDRESS_TYPE_PUBLIC;
-    random_mac_addr(local_address.addr); // 生成随机MAC
-    // local_address.addr[0]=0x11;
-    // local_address.addr[1]=0x22;
-    // local_address.addr[2]=0x33;
-    // local_address.addr[3]=0x44;
-    // local_address.addr[4]=0x55;
-    // local_address.addr[5]=0x05;
+    // random_mac_addr(local_address.addr); // 生成随机MAC
+    local_address.addr[0]=0x11;
+    local_address.addr[1]=0x22;
+    local_address.addr[2]=0x33;
+    local_address.addr[3]=0x44;
+    local_address.addr[4]=0x55;
+    local_address.addr[5]=0x06;
     (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
     g_local_addr.type = local_address.type;
     sle_set_local_addr(&g_local_addr);

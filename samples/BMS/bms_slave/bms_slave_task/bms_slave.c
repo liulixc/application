@@ -1186,6 +1186,11 @@ void *bms_salve_task(void)
         {
             printf("Discharging Current:%d mA\r\n", Current);
         }
+        else if(Current > 15000)
+        {
+            uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
+            uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
+        }
         
 
         
@@ -1247,17 +1252,17 @@ void *bms_salve_task(void)
     return 0;
 }
 
-// static void bms_slave_entry(void)
-// {
-//     osal_task *task_handle = NULL;
-//     osal_kthread_lock();
-//     task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
-//     if (task_handle != NULL) {
-//         osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
-//         osal_kfree(task_handle);
-//     }
-//     osal_kthread_unlock();
-// }
+static void bms_slave_entry(void)
+{
+    osal_task *task_handle = NULL;
+    osal_kthread_lock();
+    task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
+    if (task_handle != NULL) {
+        osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
+        osal_kfree(task_handle);
+    }
+    osal_kthread_unlock();
+}
 
-// /* Run the bms_salve_entry. */
-// app_run(bms_slave_entry);
+/* Run the bms_salve_entry. */
+app_run(bms_slave_entry);
