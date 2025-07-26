@@ -2,26 +2,26 @@
 #ifndef MONITOR_H
 #define MONITOR_H
 
-/* 任务相关 */
+/* 脠脦脦帽脧脿鹿脴 */
 #define MONITOR_TASK_PRIO 24
 #define MONITOR_STACK_SIZE 0x2000
-/* 串口接收数据结构体 */
+/* 麓庐驴脷陆脫脢脮脢媒戮脻陆谩鹿鹿脤氓 */
 typedef struct {
     uint8_t *value;
     uint16_t value_len;
 } msg_data_t;
-/* 串口接收io */
+/* 麓庐驴脷陆脫脢脮io */
 #define CONFIG_UART_TXD_PIN 15
 #define CONFIG_UART_RXD_PIN 16
 #define CONFIG_UART_PIN_MODE 1
 #define CONFIG_UART_ID UART_BUS_1
 
-#define MAX_WIFI_SSID_LEN 33     // 32个字符 + 空终止符
-#define MAX_WIFI_PASSWORD_LEN 65 // 64个字符 + 空终止符
+#define MAX_WIFI_SSID_LEN 33     // 32赂枚脳脰路没 + 驴脮脰脮脰鹿路没
+#define MAX_WIFI_PASSWORD_LEN 65 // 64赂枚脳脰路没 + 驴脮脰脮脰鹿路没
 
 typedef enum MonitorCmdType {
-    MONITOR_CMD_TYPE_NONE = 0, // 无命令
-    MONITOR_CMD_TYPE_WIFI,    // 设置WiFi
+    MONITOR_CMD_TYPE_NONE = 0, // 脦脼脙眉脕卯
+    MONITOR_CMD_TYPE_WIFI,    // 脡猫脰脙WiFi
 
 } MonitorCmdType;
 

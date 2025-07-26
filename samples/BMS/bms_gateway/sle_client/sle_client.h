@@ -11,66 +11,69 @@
  #include <stdbool.h>
  
  /**
-  * @brief ½Úµã½ÇÉ«¶¨Òå
+  * @brief èŠ‚ç‚¹è§’è‰²å®šä¹‰
   */
  typedef enum {
-     NODE_ROLE_ORPHAN = 0, // ¹Â¶ù½Úµã£¬µÈ´ı±»ÊÕÑø
-     NODE_ROLE_MEMBER = 1, // ³ÉÔ±½Úµã£¬ÒÑÈëÍø
-     NODE_ROLE_GATEWAY = 2, // Íø¹Ø½Úµã
+     NODE_ROLE_ORPHAN = 0, // å­¤å„¿èŠ‚ç‚¹ï¼Œå°šæœªåŠ å…¥ç½‘ç»œ
+     NODE_ROLE_MEMBER = 1, // æˆå‘˜èŠ‚ç‚¹ï¼Œå·²åŠ å…¥ç½‘ç»œ
+     NODE_ROLE_GATEWAY = 2, // ç½‘å…³èŠ‚ç‚¹
  } node_role_t;
  
  /**
-  * @brief ×Ô¶¨Òå³§ÉÌ¹ã²¥Êı¾İ½á¹¹
+  * @brief è‡ªå®šä¹‰å‚å•†å¹¿æ’­æ•°æ®ç»“æ„
   */
  typedef struct {
-     uint8_t len;         // Êı¾İ³¤¶È
-     uint8_t type;        // ÀàĞÍ (0xFF ±íÊ¾³§ÉÌ×Ô¶¨ÒåÊı¾İ)
-     uint16_t company_id; // ³§ÉÌID
-     uint8_t role;        // ½Úµã½ÇÉ« (node_role_t)
-     uint8_t level;       // ½ÚµãÔÚÍøÂçÖĞµÄ²ã¼¶
+     uint8_t len;         // æ•°æ®é•¿åº¦
+     uint8_t type;        // ç±»å‹ (0xFF è¡¨ç¤ºå‚å•†è‡ªå®šä¹‰æ•°æ®)
+     uint16_t company_id; // å‚å•†ID
+     uint8_t role;        // èŠ‚ç‚¹è§’è‰² (node_role_t)
+     uint8_t level;       // èŠ‚ç‚¹åœ¨ç½‘ç»œä¸­çš„å±‚çº§
  } __attribute__((packed)) network_adv_data_t;
  
  /**
-  * @brief "ÊÕÑø"ÃüÁî½á¹¹Ìå
+  * @brief "åŠ å…¥ç½‘ç»œ"å‘½ä»¤ç»“æ„å®šä¹‰
   */
- #define ADOPTION_CMD 0x01 // ¶¨ÒåÊÕÑøÃüÁîµÄ²Ù×÷Âë
+ #define ADOPTION_CMD 0x01 // è‡ªå®šä¹‰åŠ å…¥ç½‘ç»œå‘½ä»¤çš„æ“ä½œç 
  typedef struct {
-     uint8_t cmd;   // ÃüÁîÂë (ADOPTION_CMD)
-     uint8_t level; // ¸¸½ÚµãµÄ²ã¼¶
+     uint8_t cmd;   // å‘½ä»¤ç  (ADOPTION_CMD)
+     uint8_t level; // çˆ¶èŠ‚ç‚¹çš„å±‚çº§
  } __attribute__((packed)) adoption_cmd_t;
  
  /**
-  * @brief Êı¾İÉÏ±¨½á¹¹Ìå
+  * @brief æ•°æ®ä¸ŠæŠ¥ç»“æ„å®šä¹‰
   */
   typedef struct {
-    uint8_t origin_mac[6]; // Ô­Ê¼Êı¾İ½ÚµãµÄMACµØÖ·
-    char    data[];        // ¿É±ä³¤Êı¾İ (ÀıÈçJSON×Ö·û´®)
+    uint8_t origin_mac[6]; // åŸå§‹æ•°æ®å‘é€èŠ‚ç‚¹çš„MACåœ°å€
+    char    data[];        // å¯å˜é•¿æ•°æ® (é€šå¸¸ä¸ºJSONæ ¼å¼å­—ç¬¦ä¸²)
 } __attribute__((packed)) report_data_t;
  
- // ×Ó½ÚµãÁ¬½ÓĞÅÏ¢¹ÜÀí½á¹¹Ìå
+ // å­èŠ‚ç‚¹è¿æ¥ç®¡ç†ç»“æ„å®šä¹‰
  typedef struct {
-     uint16_t conn_id;       // Á¬½ÓID
-     bool is_active;         // ÊÇ·ñ»îÔ¾
-     uint8_t mac[6];         // ×Ó½ÚµãµÄMACµØÖ·
-     uint16_t write_handle;  // Îª¸Ã×Ó½Úµã´æ´¢µÄ¿ÉĞ´¾ä±ú
+     uint16_t conn_id;       // è¿æ¥ID
+     bool is_active;         // æ˜¯å¦æ¿€æ´»
+     uint8_t mac[6];         // å­èŠ‚ç‚¹çš„MACåœ°å€
+     uint16_t write_handle;  // å‘è¯¥å­èŠ‚ç‚¹ä¼ è¾“æ•°æ®çš„å¥æŸ„
  } child_node_info_t;
  
- // Éè±¸Ó³Éä½á¹¹Ìå
+ // è®¾å¤‡æ˜ å°„ç»“æ„å®šä¹‰
  typedef struct {
-     uint16_t conn_id;           // Éè±¸ID
-     uint8_t device_index;       // g_env_msgÖĞµÄÉè±¸Ë÷Òı
-     bool is_active;             // Éè±¸ÊÇ·ñ»îÔ¾
-     uint8_t mac[6];      // Éè±¸MACµØÖ·
-     char cloud_device_id[64];   // Éè±¸ID (Èç "680b91649314d11851158e8d_Battery05")
+     uint16_t conn_id;           // è®¾å¤‡ID
+     uint8_t device_index;       // g_env_msgä¸­çš„è®¾å¤‡ç´¢å¼•
+     bool is_active;             // è®¾å¤‡æ˜¯å¦æ¿€æ´»
+     uint8_t mac[6];      // è®¾å¤‡MACåœ°å€
+     char cloud_device_id[64];   // è®¾å¤‡ID (å¦‚ "680b91649314d11851158e8d_Battery05")
  } bms_device_map_t;
  
- // ³õÊ¼»¯º¯Êı
+ // åˆå§‹åŒ–å‡½æ•°
  void sle_gateway_client_init(void);
  
- // »ñÈ¡µ±Ç°Á¬½ÓµÄ×Ó½ÚµãÊıÁ¿
+ // è·å–å½“å‰è¿æ¥çš„å­èŠ‚ç‚¹æ•°é‡
  uint8_t get_active_children_count(void);
  
- // »ñÈ¡»îÔ¾Éè±¸ÊıÁ¿
+ // è·å–æ¿€æ´»è®¾å¤‡æ•°é‡
  uint8_t get_active_device_count(void);
+ 
+ // å‘æ‰€æœ‰è¿æ¥çš„å­è®¾å¤‡ä¸‹å‘å‘½ä»¤
+ void sle_gateway_send_command_to_children(uint8_t *data, uint16_t len);
  
  #endif

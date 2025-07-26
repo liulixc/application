@@ -15,29 +15,29 @@
 #include "osal_wait.h"
 
 
-// 串口id
+// 麓庐驴脷id
 #define UART_ID UART_BUS_2
-/*串口接收缓冲区大小*/
+/*麓庐驴脷陆脫脢脮禄潞鲁氓脟酶麓贸脨隆*/
 #define UART_RX_MAX 512
 uint8_t uart_rx_buffer[UART_RX_MAX];
-/* 串口接收io*/
+/* 麓庐驴脷陆脫脢脮io*/
 #define CONFIG_UART_TXD_PIN 8 
 #define CONFIG_UART_RXD_PIN 7
 #define CONFIG_UART_PIN_MODE 2
 
 uart_recv uart2_recv = {0};
 
-// 互斥锁用于AT指令收发保护
-static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
+// 禄楼鲁芒脣酶脫脙脫脷AT脰赂脕卯脢脮路垄卤拢禄陇
+static void* l610_mutex = NULL; // osal_mutex_t脦麓露篓脪氓脢卤脫脙void*
 
-uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
+uint8_t isPrintf=1;	//露篓脪氓脫脷main潞炉脢媒: 脢脟路帽麓貌脫隆脠脮脰戮
 
 #define CMD_LEN 512
-char cmdSend[CMD_LEN];		//发送上报数据的AT指令
-uint32_t DefaultTimeout=500;//超时
+char cmdSend[CMD_LEN];		//路垄脣脥脡脧卤篓脢媒戮脻碌脛AT脰赂脕卯
+uint32_t DefaultTimeout=500;//鲁卢脢卤
 
 
-// 发送数据包
+// 路垄脣脥脢媒戮脻掳眉
 uint32_t uart_send_buff(uint8_t *str, uint16_t len)
 {
     uint32_t ret = 0;
@@ -48,7 +48,7 @@ uint32_t uart_send_buff(uint8_t *str, uint16_t len)
     return ret;
 }
 
-/* 串口接收回调 */
+/* 麓庐驴脷陆脫脢脮禄脴碌梅 */
 void uart_read_handler(const void *buffer, uint16_t length, bool error)
 {
     unused(error);
@@ -59,7 +59,7 @@ void uart_read_handler(const void *buffer, uint16_t length, bool error)
     uart2_recv.recv_flag = 1;
 }
 
-/* 串口初始化配置*/
+/* 麓庐驴脷鲁玫脢录禄炉脜盲脰脙*/
 void app_uart_init_config(void)
 {
     uart_buffer_config_t uart_buffer_config;
@@ -83,15 +83,15 @@ void app_uart_init_config(void)
 
 
 /*
-函数名称: L610_SendCmd
-*说明: 	L610模组的AT指令发送
-*参数:	uint_t *cmd，需要发送的命令
-*	uint8_t *result，期望获得的结果
-	uint32_t timeOut，等待期望结果的时间
-	uint8_t isPrintf，是否打印Log
-*返回值:	无
+潞炉脢媒脙没鲁脝: L610_SendCmd
+*脣碌脙梅: 	L610脛拢脳茅碌脛AT脰赂脕卯路垄脣脥
+*虏脦脢媒:	uint_t *cmd拢卢脨猫脪陋路垄脣脥碌脛脙眉脕卯
+*	uint8_t *result拢卢脝脷脥没禄帽碌脙碌脛陆谩鹿没
+	uint32_t timeOut拢卢碌脠麓媒脝脷脥没陆谩鹿没碌脛脢卤录盲
+	uint8_t isPrintf拢卢脢脟路帽麓貌脫隆Log
+*路碌禄脴脰碌:	脦脼
 */
-// 优化后的L610 AT指令发送函数，增加互斥锁保护
+// 脫脜禄炉潞贸碌脛L610 AT脰赂脕卯路垄脣脥潞炉脢媒拢卢脭枚录脫禄楼鲁芒脣酶卤拢禄陇
 void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
     if (l610_mutex) osal_mutex_lock(l610_mutex);
     uart2_recv.recv_flag = 0;
@@ -108,7 +108,7 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
                 found = 1;
                 break;
             }
-            uart2_recv.recv_flag = 0; // 清除标志，继续等待下一个包
+            uart2_recv.recv_flag = 0; // 脟氓鲁媒卤锚脰戮拢卢录脤脨酶碌脠麓媒脧脗脪禄赂枚掳眉
         }
         osal_msleep(10);
         elapsed += 10;
@@ -121,9 +121,9 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
     if (l610_mutex) osal_mutex_unlock(l610_mutex);
 }
 /*
-函数名称: L610_Attach
-说明:L610模组初始化入网
-参数: uint8_t isPrintf:是否打印Log;   uint8_t  isReboot:是否重启;
+潞炉脢媒脙没鲁脝: L610_Attach
+脣碌脙梅:L610脛拢脳茅鲁玫脢录禄炉脠毛脥酶
+虏脦脢媒: uint8_t isPrintf:脢脟路帽麓貌脫隆Log;   uint8_t  isReboot:脢脟路帽脰脴脝么;
 */
 
 void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
@@ -134,9 +134,9 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 }
 
 /*
-函数名称: L610_Detach
-说明: L610模组离网（断开网络连接）
-参数: uint8_t isPrintf: 是否打印Log
+潞炉脢媒脙没鲁脝: L610_Detach
+脣碌脙梅: L610脛拢脳茅脌毛脥酶拢篓露脧驴陋脥酶脗莽脕卢陆脫拢漏
+虏脦脢媒: uint8_t isPrintf: 脢脟路帽麓貌脫隆Log
 */
 void L610_Detach(uint8_t isPrintf) {
 
@@ -146,13 +146,13 @@ void L610_Detach(uint8_t isPrintf) {
     if (isPrintf) printf("Detach!\r\n");
 }
 
-/********************MQTT协议****************************/
+/********************MQTT脨颅脪茅****************************/
 
 /*
-函数名称: L610_MQTTUSER
-说明: L610用户设置
-参数: Username用户名，Password用户密码，ClientIDStr客户端ID
-返回值:无
+潞炉脢媒脙没鲁脝: L610_MQTTUSER
+脣碌脙梅: L610脫脙禄搂脡猫脰脙
+虏脦脢媒: Username脫脙禄搂脙没拢卢Password脫脙禄搂脙脺脗毛拢卢ClientIDStr驴脥禄搂露脣ID
+路碌禄脴脰碌:脦脼
 */
 
 void L610_MQTTUSER(char *Username, char *Password, char *ClientIDStr){
@@ -183,7 +183,7 @@ void L610_MQTTPub(char *topic, char *msg) {
     L610_SendCmd(msgSend, "", DefaultTimeout, isPrintf);
 }
 
-// 华为云平台MQTT连接
+// 禄陋脦陋脭脝脝陆脤篓MQTT脕卢陆脫
 void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *password, int keepalive, int cleanSession) {
     memset(cmdSend, 0, sizeof(cmdSend));
     snprintf(cmdSend, sizeof(cmdSend),
@@ -192,11 +192,11 @@ void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *passwor
     L610_SendCmd(cmdSend, "OK", 5000, isPrintf);
 }
 
-// 华为云平台上报数据
+// 禄陋脦陋脭脝脝陆脤篓脡脧卤篓脢媒戮脻
 void L610_HuaweiCloudReport(char *topic, char *payload) {
     memset(cmdSend, 0, sizeof(cmdSend));
-    int payload_len = strlen(payload); // 只算原始JSON长度
-    // 构造转义后的payload
+    int payload_len = strlen(payload); // 脰禄脣茫脭颅脢录JSON鲁陇露脠
+    // 鹿鹿脭矛脳陋脪氓潞贸碌脛payload
     char payload_escaped[1024] = {0};
     int j = 0;
     for (int i = 0; payload[i] != '\0' && j < sizeof(payload_escaped) - 1; i++) {
@@ -214,12 +214,12 @@ void L610_HuaweiCloudReport(char *topic, char *payload) {
     L610_SendCmd(cmdSend, "OK", 2000, isPrintf);
 }
 
-/********************TCP协议****************************/
+/********************TCP脨颅脪茅****************************/
 /*
-函数名称: L610_OpenSocket
-说明: L610请求IP并打开Socket连接Server
-参数:server_ip,服务器IP   server_port,服务器端口
-返回值:无
+潞炉脢媒脙没鲁脝: L610_OpenSocket
+脣碌脙梅: L610脟毛脟贸IP虏垄麓貌驴陋Socket脕卢陆脫Server
+虏脦脢媒:server_ip,路镁脦帽脝梅IP   server_port,路镁脦帽脝梅露脣驴脷
+路碌禄脴脰碌:脦脼
 */
 void L610_OpenSocket_TCP(char *server_ip, char *server_port) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -227,10 +227,10 @@ void L610_OpenSocket_TCP(char *server_ip, char *server_port) {
 	L610_SendCmd(cmdSend, "+MIPOPEN:", DefaultTimeout, isPrintf);
 }
 
-/*函数名称: L610_SendMsgToTCPServer
-*说明: L610模组发送消息到TCP服务器
-*参数: *msg,待发送的数据
-*返回值:无
+/*潞炉脢媒脙没鲁脝: L610_SendMsgToTCPServer
+*脣碌脙梅: L610脛拢脳茅路垄脣脥脧没脧垄碌陆TCP路镁脦帽脝梅
+*虏脦脢媒: *msg,麓媒路垄脣脥碌脛脢媒戮脻
+*路碌禄脴脰碌:脦脼
 */
 void L610_SendMsgToTCPServer(char *msg) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -243,12 +243,12 @@ void L610_SendMsgToTCPServer(char *msg) {
 }
 
 
-/********************UDP协议****************************/
+/********************UDP脨颅脪茅****************************/
 /*
-函数名称: L610_OpenSocket
-说明: L610请求IP并打开Socket连接Server
-参数:server_ip,服务器IP   server_port,服务器端口
-返回值:无
+潞炉脢媒脙没鲁脝: L610_OpenSocket
+脣碌脙梅: L610脟毛脟贸IP虏垄麓貌驴陋Socket脕卢陆脫Server
+虏脦脢媒:server_ip,路镁脦帽脝梅IP   server_port,路镁脦帽脝梅露脣驴脷
+路碌禄脴脰碌:脦脼
 */
 void L610_OpenSocket_UDP(char *server_ip, char *server_port) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -256,10 +256,10 @@ void L610_OpenSocket_UDP(char *server_ip, char *server_port) {
 	L610_SendCmd(cmdSend, "+MIPOPEN:", DefaultTimeout, isPrintf);
 }
 
-/*函数名称: L610_SendMsgToTCPServer
-*说明: L610模组发送消息到UDP服务器
-*参数: *msg,待发送的数据:HEX格式
-*返回值:无
+/*潞炉脢媒脙没鲁脝: L610_SendMsgToTCPServer
+*脣碌脙梅: L610脛拢脳茅路垄脣脥脧没脧垄碌陆UDP路镁脦帽脝梅
+*虏脦脢媒: *msg,麓媒路垄脣脥碌脛脢媒戮脻:HEX赂帽脢陆
+*路碌禄脴脰碌:脦脼
 */
 void L610_SendMsgToUDPServer(char *msg) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -282,7 +282,7 @@ void L610_SendToken(char *token) {
 void L610_Reset(void) {
     if (l610_mutex) osal_mutex_lock(l610_mutex);
     L610_SendCmd((uint8_t *) "AT+CFUN=1,1\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
-    osal_msleep(5000); // 等待重启完成
+    osal_msleep(5000); // 碌脠麓媒脰脴脝么脥锚鲁脡
     if (l610_mutex) osal_mutex_unlock(l610_mutex);
     printf("L610 Reset!\r\n");
 }

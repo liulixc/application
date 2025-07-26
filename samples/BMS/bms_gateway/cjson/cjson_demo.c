@@ -17,15 +17,15 @@ char *combine_strings(int str_amount, char *str1, ...)
 {
     int length = string_length(str1) + 1;
     if (length == 1) {
-        return NULL; // 如果第一个字符串为空
+        return NULL; // 脠莽鹿没碌脷脪禄赂枚脳脰路没麓庐脦陋驴脮
     }
 
     char *result = malloc(length);
     if (result == NULL) {
-        return NULL; // 内存分配失败
+        return NULL; // 脛脷麓忙路脰脜盲脢搂掳脺
     }
 
-    strcpy(result, str1); // 复制第一个字符串
+    strcpy(result, str1); // 赂麓脰脝碌脷脪禄赂枚脳脰路没麓庐
 
     va_list args;
     va_start(args, str1);
@@ -34,47 +34,47 @@ char *combine_strings(int str_amount, char *str1, ...)
     while (--str_amount > 0) {
         tem_str = va_arg(args, char *);
         if (tem_str == NULL) {
-            continue; // 跳过空字符串
+            continue; // 脤酶鹿媒驴脮脳脰路没麓庐
         }
         length += string_length(tem_str);
         result = realloc(result, length);
         if (result == NULL) {
-            return NULL; // 内存重新分配失败
+            return NULL; // 脛脷麓忙脰脴脨脗路脰脜盲脢搂掳脺
         }
-        strcat(result, tem_str); // 拼接字符串
+        strcat(result, tem_str); // 脝麓陆脫脳脰路没麓庐
     }
     va_end(args);
 
-    return result; // 返回拼接后的字符串
+    return result; // 路碌禄脴脝麓陆脫潞贸碌脛脳脰路没麓庐
 }
 
 char *make_json(char *service_id, char *temperature, char *current)
 {
-    // 创建 JSON 对象
+    // 麓麓陆篓 JSON 露脭脧贸
     cJSON *root = cJSON_CreateObject();
-    // 创建 services 数组
+    // 麓麓陆篓 services 脢媒脳茅
     cJSON *services = cJSON_CreateArray();
-    // 创建 service 对象
+    // 麓麓陆篓 service 露脭脧贸
     cJSON *service = cJSON_CreateObject();
     cJSON_AddStringToObject(service, "service_id", service_id);
 
-    // 创建 properties 对象
+    // 麓麓陆篓 properties 露脭脧贸
     cJSON *properties = cJSON_CreateObject();
     cJSON_AddStringToObject(properties, "temperature", temperature);
     cJSON_AddStringToObject(properties, "current", current);
 
-    // 将 properties 添加到 service
+    // 陆芦 properties 脤铆录脫碌陆 service
     cJSON_AddItemToObject(service, "properties", properties);
 
-    // 将 service 添加到 services 数组
+    // 陆芦 service 脤铆录脫碌陆 services 脢媒脳茅
     cJSON_AddItemToArray(services, service);
 
-    // 将 services 添加到 root
+    // 陆芦 services 脤铆录脫碌陆 root
     cJSON_AddItemToObject(root, "services", services);
 
-    // 打印 JSON 字符串
+    // 麓貌脫隆 JSON 脳脰路没麓庐
     char *json_string = cJSON_Print(root);
-    // 释放内存
+    // 脢脥路脜脛脷麓忙
     cJSON_Delete(root);
     return json_string;
 }
@@ -82,23 +82,23 @@ char *make_json(char *service_id, char *temperature, char *current)
 char *parse_json(char *json_string)
 {
     char *string = NULL;
-    // 解析 JSON 字符串
+    // 陆芒脦枚 JSON 脳脰路没麓庐
     cJSON *root = cJSON_Parse(json_string);
     if (root == NULL) {
         printf("Error parsing JSON\n");
         return NULL;
     }
-    // 获取 paras 对象中的 beep 项
+    // 禄帽脠隆 paras 露脭脧贸脰脨碌脛 beep 脧卯
     cJSON *paras = cJSON_GetObjectItem(root, "paras");
     cJSON *beep = cJSON_GetObjectItem(paras, "beep");
-    // 检查并输出 beep 的值
+    // 录矛虏茅虏垄脢盲鲁枚 beep 碌脛脰碌
     if (beep && cJSON_IsString(beep)) {
         printf("beep: %s\n", beep->valuestring);
         string = beep->valuestring;
     } else {
         printf("beep not found or is not a string\n");
     }
-    // 释放内存
+    // 脢脥路脜脛脷麓忙
     cJSON_Delete(root);
     return string;
 }

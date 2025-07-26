@@ -43,4 +43,8 @@
  sle_addr_t* sle_get_remote_server_addrs(void);
  uint8_t sle_get_remote_server_count(void);
  
+ char* get_children_mac_last2(void);
+
+ void sle_client_send_command_to_children(uint8_t *data, uint16_t len);
+
  #endif

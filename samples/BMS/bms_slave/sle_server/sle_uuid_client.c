@@ -110,6 +110,7 @@
  }
  
  
+ 
  // sle_addr_t *sle_get_remote_server_addr(void)
  // {
  //     return &g_sle_remote_server_addr;
@@ -372,57 +373,44 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
      return -1;
  }
  
- //*************hybrid******************//
- // errcode_t sle_client_send_report_by_handle(const uint8_t *data, uint8_t len)
- // {
+  /**
+  * @brief 向所有连接的子设备下发命令
+  * @param data 命令数据
+  * @param len 数据长度
+  * @note 该函数会遍历所有活跃的子节点，向每个子节点发送相同的命令数据
+  */
+ void sle_client_send_command_to_children(uint8_t *data, uint16_t len)
+ {
+     if (data == NULL || len == 0) {
+         osal_printk("%s Invalid command data\r\n", SLE_CLIENT_LOG);
+         return;
+     }
+ 
+     int sent_count = 0;
+     for (int i = 0; i < MAX_CHILDREN; i++) {
+         if (g_child_nodes[i].is_active && g_child_nodes[i].write_handle != 0) {
+             ssapc_write_param_t param = {
+                 .handle = g_child_nodes[i].write_handle,
+                 .type = SSAP_PROPERTY_TYPE_VALUE,
+                 .data_len = len,
+                 .data = data,
+             };
+             
+             errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+             if (ret != ERRCODE_SUCC) {
+                 osal_printk("%s Failed to send command to child %d (conn_id:%u): %d\r\n", 
+                            SLE_CLIENT_LOG, i, g_child_nodes[i].conn_id, ret);
+             } else {
+                 osal_printk("%s Command sent to child %d (conn_id:%u)\r\n", 
+                            SLE_CLIENT_LOG, i, g_child_nodes[i].conn_id);
+                 sent_count++;
+             }
+         }
+     }
      
- //     ssapc_write_param_t param = {0};  
- 
- //     int ret = 0;
- //     for (int i = 0; i < g_num_conn; i++)
- //     {
-         
- //         if (g_conn_and_service_arr[i].find_service_result.start_hdl == 0)
- //         {
- //             continue; 
- //         }
- 
- //         param.handle = g_conn_and_service_arr[i].find_service_result.start_hdl;
- 
- //         param.type = SSAP_PROPERTY_TYPE_VALUE;
- 
- //         param.data_len = len + 1; 
- 
- //         param.data = osal_vmalloc(param.data_len);
- //         if (param.data == NULL)
- //         {
- //             printf("[sle_client_send_report_by_handle] osal_vmalloc fail\r\n");
- //             return ERRCODE_FAIL;
- //         }
- //         if (memcpy_s(param.data, param.data_len, data, len) != EOK)
- //         {
- //             osal_vfree(param.data);
- //             return ERRCODE_FAIL;
- //         }
- 
- //         ret = SsapWriteReq(g_client_id, g_conn_and_service_arr[i].conn_id, &param);
- //         if (ret != ERRCODE_SUCC)
- //         {
- //             printf("SsapWriteReq error:%d connid:%d\r\n", ret, g_conn_and_service_arr[i].conn_id);
- //         }
- 
- //         osal_vfree(param.data);
- //     }
- 
- //     return ERRCODE_SUCC;
- // }
- 
- // int sle_hybridc_send_data(uint8_t *data, uint8_t length)
- // {
- //     int ret;
- //     ret = sle_client_send_report_by_handle(data, length); 
- //     return ret;
- // }
+     osal_printk("%s Command broadcast completed. Sent to %d/%d children\r\n", 
+                SLE_CLIENT_LOG, sent_count, g_active_children_count);
+ }
  
  void sle_hybridc_init()
  {
@@ -544,4 +532,32 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
  uint8_t sle_get_remote_server_count(void)
  {
      return g_remote_server_count;
+ }
+ 
+ // 优化后的缓冲区大小
+ char* get_children_mac_last2(void)
+ {
+     static char mac_buffer[16]; // 16字节足够：MAX_CHILDREN=2时最多需要6字节
+     mac_buffer[0] = '\0';
+     
+     if (g_active_children_count == 0) {
+         strcpy(mac_buffer, "none");
+         return mac_buffer;
+     }
+     
+     for (int i = 0; i < MAX_CHILDREN; i++) {
+         if (g_child_nodes[i].is_active) {
+             char temp_mac[6];
+             // 只取MAC地址的最后一个字节（后两位十六进制）
+             snprintf(temp_mac, sizeof(temp_mac), "%02x",
+                     g_child_nodes[i].mac[5]);
+             
+             if (strlen(mac_buffer) > 0) {
+                 strcat(mac_buffer, ",");
+             }
+             strcat(mac_buffer, temp_mac);
+         }
+     }
+     
+     return mac_buffer;
  }

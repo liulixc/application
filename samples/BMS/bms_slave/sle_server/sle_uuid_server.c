@@ -15,7 +15,10 @@
  #include "sle_device_discovery.h"
  #include "sle_server_adv.h"
  #include "sle_uuid_server.h"
+ #include "sle_uuid_client.h"
  #include "sle_hybrid.h"
+ #include "cJSON.h"
+ #include "gpio.h"
  
  #define OCTET_BIT_LEN 8
  #define UUID_LEN_2     2
@@ -275,27 +278,122 @@
  }
  
  void ssaps_write_request_cbk(uint8_t server_id, uint16_t conn_id, ssaps_req_write_cb_t *write_cb_para,
-                              errcode_t status)
- {
-     (void)server_id;
-     (void)conn_id;
-     (void)status;
+                             errcode_t status)
+{
+    (void)server_id;
+    (void)conn_id;
+    (void)status;
+
+    if (write_cb_para->length == sizeof(adoption_cmd_t)) {
+        adoption_cmd_t *cmd = (adoption_cmd_t *)(write_cb_para->value);
+        if (cmd->cmd == ADOPTION_CMD) {
+            osal_printk("Adoption command received from conn_id: %d, parent_level: %d\r\n", conn_id, cmd->level);
+            hybrid_node_become_member(cmd->level);
+            return;
+        }
+    }
+    
+    // 创建一个安全的字符串缓冲区
+    char *json_str = (char*)osal_vmalloc(write_cb_para->length + 1);
+    if (json_str == NULL) {
+        printf("[ssaps_write_request_cbk] Memory allocation failed\r\n");
+        return;
+    }
+    
+    // 复制数据并确保以null结尾
+    memcpy(json_str, write_cb_para->value, write_cb_para->length);
+    json_str[write_cb_para->length] = '\0';
+    
+    // 移除可能的换行符和空白字符
+    char *end = json_str + strlen(json_str) - 1;
+    while (end > json_str && (*end == '\n' || *end == '\r' || *end == ' ' || *end == '\t')) {
+        *end = '\0';
+        end--;
+    }
+    
+    printf("[ssaps_write_request_cbk] client_send_data: %s\r\n\r\n", json_str);
+    
+    // 解析JSON命令
+    cJSON *json = cJSON_Parse(json_str);
+    if (json == NULL) {
+        printf("[ssaps_write_request_cbk] JSON parse failed\r\n");
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 检查是否为switch命令
+    cJSON *command_name = cJSON_GetObjectItem(json, "command_name");
+    if (!cJSON_IsString(command_name) || strcmp(command_name->valuestring, "switch") != 0) {
+        printf("[ssaps_write_request_cbk] Not a switch command\r\n");
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 解析paras对象
+    cJSON *paras = cJSON_GetObjectItem(json, "paras");
+    if (!cJSON_IsObject(paras)) {
+        printf("[ssaps_write_request_cbk] Missing or invalid paras object\r\n");
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 解析index
+    cJSON *index = cJSON_GetObjectItem(paras, "index");
+    if (!cJSON_IsString(index)) {
+        printf("[ssaps_write_request_cbk] Missing or invalid index\r\n");
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 解析switch
+    cJSON *switch_val = cJSON_GetObjectItem(paras, "switch");
+    if (!cJSON_IsString(switch_val)) {
+        printf("[ssaps_write_request_cbk] Missing or invalid switch value\r\n");
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 获取本机MAC地址后两位
+    sle_addr_t *local_addr = hybrid_get_local_addr();
+    char local_mac_str[3];
+    snprintf(local_mac_str, sizeof(local_mac_str), "%02X", local_addr->addr[5]);
+    
+    printf("[ssaps_write_request_cbk] Command index: %s, Local MAC last 2: %s, Switch: %s\r\n", 
+           index->valuestring, local_mac_str, switch_val->valuestring);
+    
+    // 判断index是否与本机MAC地址后两位相同
+    if (strcmp(index->valuestring, local_mac_str) == 0) {
+        // 匹配，执行继电器控制命令
+        printf("[ssaps_write_request_cbk] Index matches local MAC, executing relay control\r\n");
+        
+        int switch_state = atoi(switch_val->valuestring);
+        if (switch_state == 1) {
+            // 打开继电器
+            uapi_gpio_set_val(13, GPIO_LEVEL_HIGH);
+            uapi_gpio_set_val(14, GPIO_LEVEL_HIGH);
+            printf("[ssaps_write_request_cbk] Relay turned ON\r\n");
+        } else {
+            // 关闭继电器
+            uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
+            uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
+            printf("[ssaps_write_request_cbk] Relay turned OFF\r\n");
+        }
+    } else {
+        // 不匹配，转发给子节点
+        printf("[ssaps_write_request_cbk] Index does not match, forwarding to child nodes\r\n");
+
+        sle_client_send_command_to_children(write_cb_para->value, write_cb_para->length);
+    }
+    
+    cJSON_Delete(json);
+    osal_vfree(json_str);
+}
  
-     if (write_cb_para->length == sizeof(adoption_cmd_t)) {
-         adoption_cmd_t *cmd = (adoption_cmd_t *)(write_cb_para->value);
-         if (cmd->cmd == ADOPTION_CMD) {
-             osal_printk("Adoption command received from conn_id: %d, parent_level: %d\r\n", conn_id, cmd->level);
-             hybrid_node_become_member(cmd->level);
-             return;
-         }
-     }
-     
-     write_cb_para->value[write_cb_para->length - 1] = '\0';
-     printf("[ssaps_write_request_cbk] client_send_data: %s\r\n\r\n", write_cb_para->value);
- 
- }
- 
- 
+
  
  //****************hybrid******************//
  errcode_t sle_hybrids_init()

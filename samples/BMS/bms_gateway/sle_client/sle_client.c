@@ -394,16 +394,16 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
     char *mac_str = mac_json->valuestring;
     size_t mac_len = strlen(mac_str);
     
-    // 验证MAC地址格式 (应该是 XX:XX:XX:XX:XX:XX 格式，长度为17)
-    if (mac_len < 17) {
+    // 验证MAC地址格式 (现在只有后两位，如"0A"，长度为2)
+    if (mac_len != 2) {
         osal_printk("%s Invalid MAC address format: %s from conn_id %u\r\n", SLE_GATEWAY_LOG, mac_str, conn_id);
         cJSON_Delete(root);
         return;
     }
     
-    // 安全地解析MAC地址的最后一个字节（从十六进制字符串转换为十进制数值）
+    // 解析MAC地址后两位（从十六进制字符串转换为十进制数值）
     uint8_t mac_last_byte = 0;
-    if (sscanf(mac_str + mac_len - 2, "%02hhx", &mac_last_byte) != 1) {
+    if (sscanf(mac_str, "%02hhx", &mac_last_byte) != 1) {
         osal_printk("%s Failed to parse MAC address: %s from conn_id %u\r\n", SLE_GATEWAY_LOG, mac_str, conn_id);
         cJSON_Delete(root);
         return;
@@ -482,16 +482,21 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
         }
     }
     
-    // 解析子节点数量
     cJSON *child = cJSON_GetObjectItem(root, "child");
-    if (cJSON_IsNumber(child)) {
-        int child_val = child->valueint;
-        if (child_val >= 0 && child_val <= 255) {
-            env->child = (uint8_t)child_val;
+    if (cJSON_IsString(child) && child->valuestring != NULL) {
+        // child字段现在是字符串类型，直接复制
+        size_t copy_len = sizeof(env->child) - 1;
+        if (strlen(child->valuestring) < copy_len) {
+            copy_len = strlen(child->valuestring);
         }
+        memcpy(env->child, child->valuestring, copy_len);
+        env->child[copy_len] = '\0';
+    } else {
+        // 如果没有child字段或格式错误，设置为"none"
+        strcpy(env->child, "none");
     }
     
-    osal_printk("%s Successfully parsed data from device %u (conn_id:%u): level=%u, child=%u\r\n",
+    osal_printk("%s Successfully parsed data from device %u (conn_id:%u): level=%u, child=%s\r\n",
                 SLE_GATEWAY_LOG, mac_last_byte, conn_id, env->level, env->child);
     
     // 清理JSON对象
@@ -561,6 +566,45 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
      } else {
          osal_printk("%s Adoption command sent to conn_id %u.\r\n", SLE_GATEWAY_LOG, conn_id);
      }
+ }
+ 
+ /**
+  * @brief 向所有连接的子设备下发命令
+  * @param data 命令数据
+  * @param len 数据长度
+  * @note 该函数会遍历所有活跃的子节点，向每个子节点发送相同的命令数据
+  */
+ void sle_gateway_send_command_to_children(uint8_t *data, uint16_t len)
+ {
+     if (data == NULL || len == 0) {
+         osal_printk("%s Invalid command data\r\n", SLE_GATEWAY_LOG);
+         return;
+     }
+ 
+     int sent_count = 0;
+     for (int i = 0; i < MAX_CHILDREN; i++) {
+         if (g_child_nodes[i].is_active && g_child_nodes[i].write_handle != 0) {
+             ssapc_write_param_t param = {
+                 .handle = g_child_nodes[i].write_handle,
+                 .type = SSAP_PROPERTY_TYPE_VALUE,
+                 .data_len = len,
+                 .data = data,
+             };
+             
+             errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+             if (ret != ERRCODE_SUCC) {
+                 osal_printk("%s Failed to send command to child %d (conn_id:%u): %d\r\n", 
+                            SLE_GATEWAY_LOG, i, g_child_nodes[i].conn_id, ret);
+             } else {
+                 osal_printk("%s Command sent to child %d (conn_id:%u)\r\n", 
+                            SLE_GATEWAY_LOG, i, g_child_nodes[i].conn_id);
+                 sent_count++;
+             }
+         }
+     }
+     
+     osal_printk("%s Command broadcast completed. Sent to %d/%d children\r\n", 
+                SLE_GATEWAY_LOG, sent_count, g_active_children_count);
  }
  
  /* 新增函数：根据连接ID查找子节点索引 */

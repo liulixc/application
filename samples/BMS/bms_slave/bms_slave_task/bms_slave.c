@@ -1191,16 +1191,7 @@ void *bms_salve_task(void)
             uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
             uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
         }
-        
 
-        
-        
-        // printf("VREF2:%d \r\n",(int)gpiocode[0][5]);//从控供电正常
-        // osal_mdelay(10);
-        // printf("Read GPIO return ֵ%d \r\n",a);//温度回读正常
-        // osal_mdelay(10);
-        // printf("Read Voltage return ֵ%d \r\n",r);//电压回读正常
-        // osal_mdelay(10);
 
         // 构建BMS JSON字符串，返回json字符串指针和长度，需外部释放
         // 构建 cell_voltages 数组
@@ -1216,12 +1207,11 @@ void *bms_salve_task(void)
         // 构建根对象
         cJSON *root = cJSON_CreateObject();
 
-        // 将本机MAC地址添加到JSON对象中
+        // 将本机MAC地址后两位添加到JSON对象中
         sle_addr_t *local_addr = hybrid_get_local_addr();
-        char mac_str[18]; // xx:xx:xx:xx:xx:xx\0
-        (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02x:%02x:%02x:%02x:%02x:%02x",
-                 local_addr->addr[0], local_addr->addr[1], local_addr->addr[2],
-                 local_addr->addr[3], local_addr->addr[4], local_addr->addr[5]);
+        char mac_str[3]; // 只保留后两位，例如"0A"\0
+        (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02X",
+                 local_addr->addr[5]); // 只取MAC地址的最后一个字节
         cJSON_AddStringToObject(root, "mac", mac_str);
 
         cJSON_AddNumberToObject(root, "total", MOD_VOL);
@@ -1230,7 +1220,7 @@ void *bms_salve_task(void)
         cJSON_AddNumberToObject(root, "current", Current); 
         cJSON_AddNumberToObject(root, "SOC", SOC); // 300mV 压差均衡开关
         cJSON_AddNumberToObject(root, "level", hybrid_node_get_level()); // 节点层级
-        cJSON_AddNumberToObject(root, "child", get_active_children_count()); // 子节点数量
+        cJSON_AddStringToObject(root, "child", get_children_mac_last2());
 
         
         // 打印格式JSON
@@ -1252,17 +1242,17 @@ void *bms_salve_task(void)
     return 0;
 }
 
-// static void bms_slave_entry(void)
-// {
-//     osal_task *task_handle = NULL;
-//     osal_kthread_lock();
-//     task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
-//     if (task_handle != NULL) {
-//         osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
-//         osal_kfree(task_handle);
-//     }
-//     osal_kthread_unlock();
-// }
+static void bms_slave_entry(void)
+{
+    osal_task *task_handle = NULL;
+    osal_kthread_lock();
+    task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
+    if (task_handle != NULL) {
+        osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
+        osal_kfree(task_handle);
+    }
+    osal_kthread_unlock();
+}
 
-// /* Run the bms_salve_entry. */
-// app_run(bms_slave_entry);
+/* Run the bms_salve_entry. */
+app_run(bms_slave_entry);

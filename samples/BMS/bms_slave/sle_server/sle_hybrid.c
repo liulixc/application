@@ -114,7 +114,7 @@ void hybrid_node_revert_to_orphan(void)
 
     // 添加延迟，确保网络拓扑稳定
     osal_printk("Waiting for network to stabilize...\r\n");
-    osal_msleep(2000); // 等待2秒钟
+    osal_msleep(2500); // 等待2.5秒钟
 
     // 重新启动广播
     sle_start_announce(SLE_ADV_HANDLE_DEFAULT);
@@ -131,6 +131,7 @@ void hybrid_node_revert_to_orphan(void)
  */
 void sle_hybrid_task(char *arg)
 {
+    osal_msleep(2500); // 等待2.5秒钟
     unused(arg);  // 处理未使用的参数
     errcode_t ret = 0;  // 操作返回状态码
     
@@ -143,7 +144,7 @@ void sle_hybrid_task(char *arg)
     local_address.addr[2]=0x33;
     local_address.addr[3]=0x44;
     local_address.addr[4]=0x55;
-    local_address.addr[5]=0x03;
+    local_address.addr[5]=0x09;
     (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
     g_local_addr.type = local_address.type;
     sle_set_local_addr(&g_local_addr);
@@ -171,10 +172,10 @@ void sle_hybrid_task(char *arg)
     while (1) {
         // 例如，可以周期性地打印当前网络状态
         osal_msleep(5000);
-        osal_printk("Current role: %d, level: %d, children: %d\r\n",
+        osal_printk("Current role: %d, level: %d, children: %s\r\n",
                     g_network_status.role,
                     g_network_status.level,
-                    get_active_children_count());
+                    get_children_mac_last2());
                      // 作为成员节点，且有父节点连接时，上报自己的数据
                      
     }
