@@ -1168,15 +1168,15 @@ void *bms_salve_task(void)
             }
         }
 
-        for(int i = 0; i < 5; i++)//高温告警断电
-        {
-            if((int)LTC6804_Calculate_Temperature((int)gpiocode[0][i]) > 40000)
-            {
-                uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
-                uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
-                // printf("OVER Temperature! Power has been cut off!\r\n");
-            }
-        }
+        // for(int i = 0; i < 5; i++)//高温告警断电
+        // {
+        //     if((int)LTC6804_Calculate_Temperature((int)gpiocode[0][i]) > 40000)
+        //     {
+        //         uapi_gpio_set_val(13, GPIO_LEVEL_LOW);
+        //         uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
+        //         // printf("OVER Temperature! Power has been cut off!\r\n");
+        //     }
+        // }
 
         if(Current < 0.2)
         {

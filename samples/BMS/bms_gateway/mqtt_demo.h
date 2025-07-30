@@ -16,10 +16,10 @@ typedef struct {
 } MQTT_msg;
 
 typedef struct {
-    float temperature[5]; // 温度
-    float current;     // 电流
-    float cell_voltages[12]; // 电池电压
-    float total_voltage; // 总电压
+    int temperature[5]; // 温度
+    int current;     // 电流
+    int cell_voltages[12]; // 电池电压
+    int total_voltage; // 总电压
     uint8_t soc; // SOC
     uint8_t level; // 节点层级
     char child[32]; // 子节点MAC地址后两位

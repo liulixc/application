@@ -73,8 +73,17 @@ char g_response_id[100] = {0}; // 保存命令id缓冲区
 char g_response_buf[] =
     "{\"result_code\": 0,\"response_name\": \"battery\",\"paras\": {\"result\": \"success\"}}"; // 响应json
 
-volatile MQTT_msg g_cmd_msg;        // 全局命令消息变量
-volatile int g_cmd_msg_flag = 0;    // 命令消息标志
+// 命令队列相关定义
+#define MAX_CMD_QUEUE_SIZE 5
+typedef struct {
+    MQTT_msg cmd_msg;
+    char response_id[100];
+} cmd_queue_item_t;
+
+volatile cmd_queue_item_t g_cmd_queue[MAX_CMD_QUEUE_SIZE];
+volatile int g_cmd_queue_head = 0;
+volatile int g_cmd_queue_tail = 0;
+volatile int g_cmd_queue_count = 0;
 extern int wifi_msg_flag; // WiFi配置修改标志
 
 
@@ -112,43 +121,51 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
     
     printf("[MQTT消息] 收到消息，主题: %s\n", topic_name);
     
-    // 直接写入全局命令变量
-    memset((void*)&g_cmd_msg, 0, sizeof(MQTT_msg));
+    // 检查队列是否已满
+    if (g_cmd_queue_count >= MAX_CMD_QUEUE_SIZE) {
+        printf("[命令队列] 队列已满，丢弃命令\n");
+        return 1;
+    }
     
-    // 安全拷贝payload内容，防止悬挂指针
+    // 获取队列尾部位置
+    int tail_index = g_cmd_queue_tail;
+    
+    // 清空队列项
+    memset((void*)&g_cmd_queue[tail_index], 0, sizeof(cmd_queue_item_t));
+    
+    // 安全拷贝payload内容
     if (message && message->payload && message->payloadlen > 0) {
-        size_t copy_len = sizeof(g_cmd_msg.receive_payload) - 1;
+        size_t copy_len = sizeof(g_cmd_queue[tail_index].cmd_msg.receive_payload) - 1;
         if ((size_t)message->payloadlen < copy_len) copy_len = message->payloadlen;
-        memcpy(g_cmd_msg.receive_payload, message->payload, copy_len);
-        g_cmd_msg.receive_payload[copy_len] = '\0';
+        memcpy(g_cmd_queue[tail_index].cmd_msg.receive_payload, message->payload, copy_len);
+        g_cmd_queue[tail_index].cmd_msg.receive_payload[copy_len] = '\0';
     } else {
-        g_cmd_msg.receive_payload[0] = '\0';
+        g_cmd_queue[tail_index].cmd_msg.receive_payload[0] = '\0';
     }
     
     // 从topic中提取request_id
-    // 华为云IoT平台命令topic格式: $oc/devices/{device_id}/sys/commands/request_id={request_id}
     char *request_id_pos = strstr(topic_name, "request_id=");
     if (request_id_pos != NULL) {
-        // 跳过"request_id="字符串
         request_id_pos += strlen("request_id=");
-        
-        // 复制request_id到全局变量
         size_t id_len = strlen(request_id_pos);
-        if (id_len < sizeof(g_response_id)) {
-            strcpy(g_response_id, request_id_pos);
-            printf("[请求ID] 提取到request_id: %s\n", g_response_id);
+        if (id_len < sizeof(g_cmd_queue[tail_index].response_id)) {
+            strcpy(g_cmd_queue[tail_index].response_id, request_id_pos);
+            printf("[请求ID] 提取到request_id: %s\n", g_cmd_queue[tail_index].response_id);
         } else {
             printf("[请求ID] request_id过长，截断处理\n");
-            strncpy(g_response_id, request_id_pos, sizeof(g_response_id) - 1);
-            g_response_id[sizeof(g_response_id) - 1] = '\0';
+            strncpy(g_cmd_queue[tail_index].response_id, request_id_pos, sizeof(g_cmd_queue[tail_index].response_id) - 1);
+            g_cmd_queue[tail_index].response_id[sizeof(g_cmd_queue[tail_index].response_id) - 1] = '\0';
         }
     } else {
         printf("[请求ID] 未找到request_id，使用默认值\n");
-        strcpy(g_response_id, "default_request_id");
+        strcpy(g_cmd_queue[tail_index].response_id, "default_request_id");
     }
     
-    g_cmd_msg_flag = 1; // 标记有新命令
-    printf("[MQTT消息] 消息内容: %s\n", g_cmd_msg.receive_payload);
+    // 更新队列状态
+    g_cmd_queue_tail = (g_cmd_queue_tail + 1) % MAX_CMD_QUEUE_SIZE;
+    g_cmd_queue_count++;
+    
+    printf("[命令队列] 命令已入队，队列长度: %d，消息内容: %s\n", g_cmd_queue_count, g_cmd_queue[tail_index].cmd_msg.receive_payload);
     return 1;
 }
 
@@ -453,21 +470,27 @@ int mqtt_task(void)
             printf("[WiFi重连] WiFi重连流程完成\n");
         }
         
-        // 处理下发命令
-        if (g_cmd_msg_flag) {
-            printf("[命令处理] 收到命令: %s\n", g_cmd_msg.receive_payload);
+        // 处理命令队列
+        if (g_cmd_queue_count > 0) {
+            // 获取队列头部命令
+            int head_index = g_cmd_queue_head;
+            cmd_queue_item_t current_cmd = g_cmd_queue[head_index];
+            
+            printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
             
             // 直接下发命令给所有子设备，不进行JSON解析
-            sle_gateway_send_command_to_children((uint8_t*)g_cmd_msg.receive_payload, strlen(g_cmd_msg.receive_payload));
+            sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
             
             // 构建并发送响应
-            sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, g_response_id);
+            sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
             mqtt_publish(g_send_buffer, g_response_buf);
             printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
             
-            // 清理
-            memset(g_response_id, 0, sizeof(g_response_id));
-            g_cmd_msg_flag = 0;
+            // 更新队列状态
+            g_cmd_queue_head = (g_cmd_queue_head + 1) % MAX_CMD_QUEUE_SIZE;
+            g_cmd_queue_count--;
+            
+            printf("[命令队列] 命令处理完成，剩余队列长度: %d\n", g_cmd_queue_count);
         }
         
         // 智能网络管理逻辑
@@ -520,14 +543,14 @@ int mqtt_task(void)
                         char temp_str[128], cell_str[256]; // 临时字符串缓冲区
                         
                         // 构建温度数组字符串
-                        snprintf(temp_str, sizeof(temp_str), "[%.1f,%.1f,%.1f,%.1f,%.1f]",
+                        snprintf(temp_str, sizeof(temp_str), "[%d,%d,%d,%d,%d]",
                                 g_env_msg[i].temperature[0], g_env_msg[i].temperature[1],
                                 g_env_msg[i].temperature[2], g_env_msg[i].temperature[3],
                                 g_env_msg[i].temperature[4]);
                         
                         // 构建电池电压数组字符串
                         snprintf(cell_str, sizeof(cell_str), 
-                                "[%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f]",
+                                "[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
                                 g_env_msg[i].cell_voltages[0], g_env_msg[i].cell_voltages[1],
                                 g_env_msg[i].cell_voltages[2], g_env_msg[i].cell_voltages[3],
                                 g_env_msg[i].cell_voltages[4], g_env_msg[i].cell_voltages[5],
@@ -538,7 +561,7 @@ int mqtt_task(void)
                         // 构建完整的网关格式JSON（修改child字段格式）
                         snprintf(json_buffer, sizeof(json_buffer),
                                 "{\"devices\":[{\"device_id\":\"680b91649314d11851158e8d_Battery%02d\",\"services\":[{\"service_id\":\"ws63\","
-                                "\"properties\":{\"temperature\":%s,\"current\":%.2f,\"total_voltage\":%.2f,"
+                                "\"properties\":{\"temperature\":%s,\"current\":%d,\"total_voltage\":%d,"
                                 "\"SOC\":%d,\"cell_voltages\":%s,\"level\":%d,\"child\":\"%s\"}}]}]}",  // child改为字符串格式
                                 i, temp_str, 
                                 g_env_msg[i].current, g_env_msg[i].total_voltage, g_env_msg[i].soc, cell_str,
@@ -590,7 +613,10 @@ static void mqtt_sample_entry(void)
     osal_task *task_handle = NULL;
     // 初始化全局结构体，防止野指针
     memset((void*)&g_env_msg, 0, sizeof(g_env_msg));
-    memset((void*)&g_cmd_msg, 0, sizeof(g_cmd_msg));
+    memset((void*)&g_cmd_queue, 0, sizeof(g_cmd_queue));
+    g_cmd_queue_head = 0;
+    g_cmd_queue_tail = 0;
+    g_cmd_queue_count = 0;
     MQTTClient_init(); // 只在入口初始化一次
     // 加锁，防止多线程冲突
     
