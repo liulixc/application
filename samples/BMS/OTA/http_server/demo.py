@@ -3,7 +3,7 @@ import socketserver
 import socket
 import os  # 确保已导入 os 模块
 
-PORT = 8082
+PORT = 8080
 FIRMWARE_FILE = "test.fwpkg"  # 修改为 .fwpkg 文件
 
 class OTAHandler(http.server.SimpleHTTPRequestHandler):

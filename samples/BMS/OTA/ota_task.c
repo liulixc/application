@@ -1,3 +1,6 @@
+#include "string.h"
+#include "lwip/netifapi.h"
+#include "wifi_hotspot.h"
 #include "wifi_hotspot_config.h"
 #include "stdlib.h"
 #include "uart.h"
@@ -11,7 +14,6 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/netdb.h"
 #include "unistd.h"
-#include "errno.h"
 #include "wifi_connect.h"
 #include "upg.h"
 #include "partition.h"
@@ -21,18 +23,12 @@
 #define RECV_BUFFER_SIZE     1024
 #define DELAY_TIME_MS 100
 #define HTTPC_DEMO_RECV_BUFSIZE 200  
-#define SOCK_TARGET_PORT  8082
-#define RECEIVE_TIMEOUT_TV_SEC 10  // 接收超时10秒
-#define RECEIVE_TIMEOUT_TV_USEC 0  // 接收超时0微秒  
-
-#define CONFIG_WIFI_SSID "QQ" // 要连接的WiFi热点账号
-#define CONFIG_WIFI_PWD "tangyuan" // 要连接的WiFi热点密码
-
+#define SOCK_TARGET_PORT  8080  
 #define SERVER_HOST   "quan.suning.com"
-#define SERVER_IP     "172.30.28.86"//无法使用dns时采用手动ping解析域名
+#define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
 static const char *g_request = 
     "GET /test.fwpkg HTTP/1.1\r\n"
-    "Host: 172.30.28.86:8082\r\n"  // 必须添加 Host 头
+    "Host: 1.13.92.135:8080\r\n"  // 必须添加 Host 头
     "Connection: close\r\n"
     "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
 uint8_t recv_buffer[RECV_BUFFER_SIZE] = {0};
@@ -77,6 +73,35 @@ errcode_t ota_prepare(uint32_t file_size)
 //-------------------------ota----------------------------//
 
 //******************http**************************//
+static void wifi_scan_state_changed(td_s32 state, td_s32 size)
+{
+    UNUSED(state);
+    UNUSED(size);
+    printf("Scan done!\r\n");
+    return;
+}
+static void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru *info, td_s32 reason_code)
+{
+    UNUSED(reason_code);
+    if (state == WIFI_STATE_AVALIABLE)
+        printf("[WiFi]:%s, [RSSI]:%d\r\n", info->ssid, info->rssi);
+}
+static int my_wifi_init(void)
+{
+    wifi_event_stru wifi_event_cb = {0};
+    wifi_event_cb.wifi_event_scan_state_changed = wifi_scan_state_changed;
+    wifi_event_cb.wifi_event_connection_changed = wifi_connection_changed;
+     /* 注册事件回调 */
+    if (wifi_register_event_cb(&wifi_event_cb) != 0) 
+    {
+        printf("wifi_event_cb register fail.\r\n");
+        return -1;
+    }
+    printf("wifi_event_cb register succ.\r\n");
+    wifi_connect();
+    return 0;
+}
+
 
 int http_clienti_get(const char *argument) {
     unused(argument);
@@ -87,100 +112,116 @@ int http_clienti_get(const char *argument) {
     errcode_t ret = 0;
     uint32_t file_size = 0;
 
+    my_wifi_init();
     struct sockaddr_in addr = {0};
-
-    wifi_connect(CONFIG_WIFI_SSID, CONFIG_WIFI_PWD);
-    
-    // WiFi连接后等待网络完全就绪
-    osal_printk("[ota task]: Waiting for network ready...\r\n");
-    osDelay(3000);  // 等待3秒确保网络稳定
-    
-
-    addr.sin_family = AF_INET;
-    addr.sin_port = PP_HTONS(SOCK_TARGET_PORT);
-    addr.sin_addr.s_addr = inet_addr(SERVER_IP);
-    int s = socket(AF_INET, SOCK_STREAM, 0);
-    osal_printk("s = %d\r\n", s);
-    if (s < 0)
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) 
     {
-        return;
+        osal_printk("socket init fail!!\r\n");
+        return -1;
     }
 
-    // socket连接服务器
-     osal_printk("NO1:... allocated socket\r\n");
-     if (connect(s, (struct sockaddr *)&addr, sizeof(addr)) != 0)
-     {
-         osal_printk("... socket connect failed errno=%d", errno);
-         lwip_close(s);
-         return -1;
-     }
-     osal_printk("NO2:... connected\r\n");
-     
-     // 发送HTTP GET请求
-     if (lwip_write(s, g_request, strlen(g_request)) < 0)
-     {
-         lwip_close(s);
-         return -1;
-     }
-     osal_printk("NO3:... socket send success\r\n");
- 
-     // 设置接收超时
-     struct timeval receiving_timeout;
-     receiving_timeout.tv_sec = RECEIVE_TIMEOUT_TV_SEC;
-     receiving_timeout.tv_usec = RECEIVE_TIMEOUT_TV_USEC;
-     if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &receiving_timeout, sizeof(receiving_timeout)) < 0)
-     {
-         osal_printk("... failed to set socket receiving timeout\r\n");
-         lwip_close(s);
-         return -1;
-     }
-     osal_printk("NO4:... set socket receiving timeout success\r\n");
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(SOCK_TARGET_PORT);
+    addr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0) 
+    {
+        osal_printk("sock connect fail\r\n");
+        lwip_close(sockfd);
+        return -1;
+    }
+    osal_printk("sock connect succ\r\n");
+
+    if (send(sockfd, g_request, strlen(g_request), 0) < 0) 
+    {
+        osal_printk("sock send fail\r\n");
+        lwip_close(sockfd);
+        return -1;
+    }
+    osal_printk("[ota task] : http send succ\r\n");
 
     // 响应头累积与解析
-    static char header_buffer[RECV_BUFFER_SIZE] = {0};
+    static char header_buffer[2048] = {0};  // 增大缓冲区
     static int header_offset = 0;
+    static int body_data_in_first_packet = 0;  // 第一个包中包含的响应体数据长度
+    
     while (!head_recv) 
     {
-        int bytes_received = lwip_read(s, recv_buffer, sizeof(recv_buffer));
-        osal_printk("Received header:\r\n%s\r\n",header_buffer);
+        int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         if (bytes_received <= 0) 
         {
             osal_printk("[ota task] :1 http recv fail\r\n");
-            lwip_close(s);
+            lwip_close(sockfd);
             return -1;
         }
         upg_watchdog_kick();
 
         // 累积响应头
-        memcpy(header_buffer + header_offset, recv_buffer, bytes_received);
-        header_offset += bytes_received;
+        if (header_offset + bytes_received < sizeof(header_buffer)) {
+            memcpy(header_buffer + header_offset, recv_buffer, bytes_received);
+            header_offset += bytes_received;
+            header_buffer[header_offset] = '\0';  // 确保字符串结束
+        }
 
-        // 查找响应头结束标记
-        char *head_end = osal_strstr(header_buffer, "\r\n\r\n");
+        // 查找响应头结束标记 "\r\n\r\n"
+        char *head_end = strstr(header_buffer, "\r\n\r\n");
         if (head_end) 
         {
-            data_start_offset = (head_end - header_buffer) + 4;
-            // 解析 Content-Length
-            char *content_length_str = osal_strstr(header_buffer, "Content-Length:");
+            int header_length = (head_end - header_buffer) + 4;
+            body_data_in_first_packet = header_offset - header_length;
+            
+            osal_printk("[ota task] : header length=%d, body data in first packet=%d\r\n", 
+                       header_length, body_data_in_first_packet);
+            
+            // 使用 strstr 解析 Content-Length（按照开发指南建议）
+            char *content_length_str = strstr(header_buffer, "Content-Length:");
             if (content_length_str) {
                 content_length_str += strlen("Content-Length:");
-                char *endptr = NULL;
-                file_size = strtol(content_length_str, &endptr, 10);
-                if (endptr && (*endptr == '\r' || *endptr == '\n' || isspace(*endptr))) 
-                {
+                // 跳过空格
+                while (*content_length_str == ' ' || *content_length_str == '\t') {
+                    content_length_str++;
+                }
+                file_size = atoi(content_length_str);
+                
+                osal_printk("[ota task] : parsed Content-Length: %d\r\n", file_size);
+                
+                if (file_size > 0) {
                     head_recv = 1;
-                    osal_printk("[ota task] : recv http data length: %d\r\n", file_size);
+                    
+                    // 执行OTA准备工作
                     if (ota_prepare(file_size) != ERRCODE_SUCC) 
                     {
                         osal_printk("[ota task] : ota prepare FAIL\r\n");
-                        lwip_close(s);
+                        lwip_close(sockfd);
                         return -1;
                     }
+                    
+                    // 如果第一个包中包含响应体数据，先写入这部分数据
+                    if (body_data_in_first_packet > 0) {
+                        int write_size = body_data_in_first_packet;
+                        if (write_size > file_size) {
+                            write_size = file_size;
+                        }
+                        
+                        osal_printk("[ota task] : writing first body data, size=%d\r\n", write_size);
+                        
+                        // 写入第一部分响应体数据
+                        uapi_upg_write_package_sync(0, header_buffer + header_length, write_size);
+                        total_recieved = write_size;
+                        first_check = 1;  // 标记已处理第一个包
+                        
+                        osal_printk("[ota task] : first body data written, total_received=%d\r\n", total_recieved);
+                    }
+                } else {
+                    osal_printk("[ota task] : invalid Content-Length\r\n");
+                    lwip_close(sockfd);
+                    return -1;
                 }
+            } else {
+                osal_printk("[ota task] : Content-Length not found\r\n");
+                lwip_close(sockfd);
+                return -1;
             }
-            // 重置响应头缓冲区
-            memset(header_buffer, 0, RECV_BUFFER_SIZE);
-            header_offset = 0;
         }
     }
 
@@ -188,14 +229,25 @@ int http_clienti_get(const char *argument) {
     while (total_recieved < file_size) 
     {
         memset(recv_buffer, 0, sizeof(recv_buffer));  // 清空响应体缓冲区
-        int bytes_received = lwip_read(s, recv_buffer, sizeof(recv_buffer));
+        int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         upg_watchdog_kick();
-        if (bytes_received == 0 && total_recieved == file_size) 
-            break;
+        
+        osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
+        
+        if (bytes_received == 0) {
+            osal_printk("[ota task] : recv 0 bytes, connection closed\r\n");
+            if (total_recieved == file_size) {
+                osal_printk("[ota task] : all data received, breaking\r\n");
+                break;
+            } else {
+                osal_printk("[ota task] : incomplete data, expected %d but got %d\r\n", file_size, total_recieved);
+                break;
+            }
+        }
         if (bytes_received < 0) 
         {
             osal_printk("[ota task] :2 http recv fail\r\n");
-            lwip_close(s);
+            lwip_close(sockfd);
             return -1;
         }
 
@@ -204,24 +256,21 @@ int http_clienti_get(const char *argument) {
         if (total_recieved + bytes_received > file_size) 
         {
             write_size = file_size - total_recieved;
+            osal_printk("[ota task] : adjusting write_size from %d to %d\r\n", bytes_received, write_size);
         }
+        
+        osal_printk("[ota task] : about to write %d bytes\r\n", write_size);
 
-        if (first_check == 0) 
-        {
-            // 第一次写入（跳过响应头）
-            uapi_upg_write_package_sync(
-                total_recieved,
-                recv_buffer + data_start_offset,
-                write_size
-            );
-            total_recieved += (write_size);
-            first_check = 1;
-        } 
-        else 
-        {
-            // 后续写入全部有效数据
-            uapi_upg_write_package_sync(total_recieved, recv_buffer, write_size);
-            total_recieved += write_size;
+        // 写入接收到的数据（响应头已在前面处理）
+        osal_printk("[ota task] : write progress %d/%d, writing %d bytes\r\n", total_recieved, file_size, write_size);
+        uapi_upg_write_package_sync(total_recieved, recv_buffer, write_size);
+        total_recieved += write_size;
+        osal_printk("[ota task] : after write, total_received=%d\r\n", total_recieved);
+        
+        // 添加数据完整性检查（按照开发指南建议）
+        if (total_recieved % 1024 == 0 || total_recieved == file_size) {
+            osal_printk("[ota task] : progress checkpoint: %d/%d (%.1f%%)\r\n", 
+                       total_recieved, file_size, (float)total_recieved * 100.0 / file_size);
         }
 
         // 超量保护（防止循环条件失效）
@@ -233,16 +282,27 @@ int http_clienti_get(const char *argument) {
     }
 
     osal_printk("[ota task] : recv all succ\r\n");
+    
+    // 数据完整性最终检查
+    if (total_recieved != file_size) {
+        osal_printk("[ota task] : data incomplete! expected=%d, received=%d\r\n", file_size, total_recieved);
+        lwip_close(sockfd);
+        return -1;
+    }
+    
+    osal_printk("[ota task] : data integrity check passed, starting upgrade...\r\n");
 
     ret = uapi_upg_request_upgrade(false);
     if (ret != ERRCODE_SUCC) {
         osal_printk("[ota task] : uapi_upg_request_upgrade error = 0x%x\r\n", ret);
-        lwip_close(s);
+        lwip_close(sockfd);
         return -1;
     }
+    
+    osal_printk("[ota task] : upgrade request successful, system will reboot...\r\n");
 
     upg_reboot();
-    lwip_close(s);
+    lwip_close(sockfd);
     return 0;
 }
 //---------------------http------------------------------//
