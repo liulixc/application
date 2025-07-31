@@ -24,15 +24,19 @@
 #define DELAY_TIME_MS 100
 #define HTTPC_DEMO_RECV_BUFSIZE 200  
 #define SOCK_TARGET_PORT  8080  
-#define SERVER_HOST   "quan.suning.com"
+
+#define SSID  "QQ"
+#define PASSWORD "tangyuan"
+
+// #define SERVER_HOST   "quan.suning.com"
 #define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
 static const char *g_request = 
     "GET /test.fwpkg HTTP/1.1\r\n"
     "Host: 1.13.92.135:8080\r\n"  // 必须添加 Host 头
     "Connection: close\r\n"
     "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
-uint8_t recv_buffer[RECV_BUFFER_SIZE] = {0};
 
+uint8_t recv_buffer[RECV_BUFFER_SIZE] = {0};
 
 //*************************ota**************************//
 
@@ -51,10 +55,10 @@ errcode_t ota_prepare(uint32_t file_size)
     /* 1. 初始化update模块 */ 
     /* 2. 获取APP升级文件大小上限. */ 
     max_len = uapi_upg_get_storage_size(); 
-    osal_printk("[oat task]:availaibe  storage size : %d\r\n",max_len);
+    osal_printk("[ota task]: available storage size : %d\r\n",max_len);
     if(file_size > max_len)
     {
-        osal_printk("[oat task]: file_size > max_len");
+        osal_printk("[ota task]: file_size > max_len");
         return -1;
     }
 
@@ -73,34 +77,6 @@ errcode_t ota_prepare(uint32_t file_size)
 //-------------------------ota----------------------------//
 
 //******************http**************************//
-static void wifi_scan_state_changed(td_s32 state, td_s32 size)
-{
-    UNUSED(state);
-    UNUSED(size);
-    printf("Scan done!\r\n");
-    return;
-}
-static void wifi_connection_changed(td_s32 state, const wifi_linked_info_stru *info, td_s32 reason_code)
-{
-    UNUSED(reason_code);
-    if (state == WIFI_STATE_AVALIABLE)
-        printf("[WiFi]:%s, [RSSI]:%d\r\n", info->ssid, info->rssi);
-}
-static int my_wifi_init(void)
-{
-    wifi_event_stru wifi_event_cb = {0};
-    wifi_event_cb.wifi_event_scan_state_changed = wifi_scan_state_changed;
-    wifi_event_cb.wifi_event_connection_changed = wifi_connection_changed;
-     /* 注册事件回调 */
-    if (wifi_register_event_cb(&wifi_event_cb) != 0) 
-    {
-        printf("wifi_event_cb register fail.\r\n");
-        return -1;
-    }
-    printf("wifi_event_cb register succ.\r\n");
-    wifi_connect();
-    return 0;
-}
 
 
 int http_clienti_get(const char *argument) {
@@ -112,7 +88,7 @@ int http_clienti_get(const char *argument) {
     errcode_t ret = 0;
     uint32_t file_size = 0;
 
-    my_wifi_init();
+    wifi_connect(SSID,PASSWORD);
     struct sockaddr_in addr = {0};
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
@@ -232,7 +208,7 @@ int http_clienti_get(const char *argument) {
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         upg_watchdog_kick();
         
-        osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
+        // osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         
         if (bytes_received == 0) {
             osal_printk("[ota task] : recv 0 bytes, connection closed\r\n");
@@ -259,18 +235,19 @@ int http_clienti_get(const char *argument) {
             osal_printk("[ota task] : adjusting write_size from %d to %d\r\n", bytes_received, write_size);
         }
         
-        osal_printk("[ota task] : about to write %d bytes\r\n", write_size);
+        // osal_printk("[ota task] : about to write %d bytes\r\n", write_size);
 
         // 写入接收到的数据（响应头已在前面处理）
-        osal_printk("[ota task] : write progress %d/%d, writing %d bytes\r\n", total_recieved, file_size, write_size);
+        // osal_printk("[ota task] : write progress %d/%d, writing %d bytes\r\n", total_recieved, file_size, write_size);
         uapi_upg_write_package_sync(total_recieved, recv_buffer, write_size);
         total_recieved += write_size;
-        osal_printk("[ota task] : after write, total_received=%d\r\n", total_recieved);
+        // osal_printk("[ota task] : after write, total_received=%d\r\n", total_recieved);
         
         // 添加数据完整性检查（按照开发指南建议）
         if (total_recieved % 1024 == 0 || total_recieved == file_size) {
-            osal_printk("[ota task] : progress checkpoint: %d/%d (%.1f%%)\r\n", 
-                       total_recieved, file_size, (float)total_recieved * 100.0 / file_size);
+            int progress_percent = (total_recieved * 100) / file_size;
+            osal_printk("[ota task] : progress checkpoint: %d/%d (%d%%)\r\n", 
+                       total_recieved, file_size, progress_percent);
         }
 
         // 超量保护（防止循环条件失效）
