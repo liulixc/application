@@ -110,7 +110,7 @@ void uart_ota_init_config(void)
     
     // 串口属性配置
     uart_attr_t attr = {
-        .baud_rate = 921600, 
+        .baud_rate = 921600, \\115200传输有问题
         .data_bits = UART_DATA_BIT_8, 
         .stop_bits = UART_STOP_BIT_1, 
         .parity = UART_PARITY_NONE
