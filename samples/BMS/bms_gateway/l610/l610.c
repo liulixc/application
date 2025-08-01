@@ -15,29 +15,29 @@
 #include "osal_wait.h"
 
 
-// ´®¿Úid
+// 串口id
 #define UART_ID UART_BUS_2
-/*´®¿Ú½ÓÊÕ»º³åÇø´óÐ¡*/
+/*串口接收缓冲区大小*/
 #define UART_RX_MAX 512
 uint8_t uart_rx_buffer[UART_RX_MAX];
-/* ´®¿Ú½ÓÊÕio*/
+/* 串口接收io*/
 #define CONFIG_UART_TXD_PIN 8 
 #define CONFIG_UART_RXD_PIN 7
 #define CONFIG_UART_PIN_MODE 2
 
 uart_recv uart2_recv = {0};
 
-// »¥³âËøÓÃÓÚATÖ¸ÁîÊÕ·¢±£»¤
-static void* l610_mutex = NULL; // osal_mutex_tÎ´¶¨ÒåÊ±ÓÃvoid*
+// 互斥锁用于AT指令收发保护
+static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
 
-uint8_t isPrintf=1;	//¶¨ÒåÓÚmainº¯Êý: ÊÇ·ñ´òÓ¡ÈÕÖ¾
+uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
 #define CMD_LEN 512
-char cmdSend[CMD_LEN];		//·¢ËÍÉÏ±¨Êý¾ÝµÄATÖ¸Áî
-uint32_t DefaultTimeout=500;//³¬Ê±
+char cmdSend[CMD_LEN];		//发送上报数据的AT指令
+uint32_t DefaultTimeout=500;//超时
 
 
-// ·¢ËÍÊý¾Ý°ü
+// 发送数据包
 uint32_t uart_send_buff(uint8_t *str, uint16_t len)
 {
     uint32_t ret = 0;
@@ -48,7 +48,7 @@ uint32_t uart_send_buff(uint8_t *str, uint16_t len)
     return ret;
 }
 
-/* ´®¿Ú½ÓÊÕ»Øµ÷ */
+/* 串口接收回调 */
 void uart_read_handler(const void *buffer, uint16_t length, bool error)
 {
     unused(error);
@@ -59,7 +59,7 @@ void uart_read_handler(const void *buffer, uint16_t length, bool error)
     uart2_recv.recv_flag = 1;
 }
 
-/* ´®¿Ú³õÊ¼»¯ÅäÖÃ*/
+/* 串口初始化配置*/
 void app_uart_init_config(void)
 {
     uart_buffer_config_t uart_buffer_config;
@@ -83,15 +83,15 @@ void app_uart_init_config(void)
 
 
 /*
-º¯ÊýÃû³Æ: L610_SendCmd
-*ËµÃ÷: 	L610Ä£×éµÄATÖ¸Áî·¢ËÍ
-*²ÎÊý:	uint_t *cmd£¬ÐèÒª·¢ËÍµÄÃüÁî
-*	uint8_t *result£¬ÆÚÍû»ñµÃµÄ½á¹û
-	uint32_t timeOut£¬µÈ´ýÆÚÍû½á¹ûµÄÊ±¼ä
-	uint8_t isPrintf£¬ÊÇ·ñ´òÓ¡Log
-*·µ»ØÖµ:	ÎÞ
+函数名称: L610_SendCmd
+*说明: 	L610模组的AT指令发送
+*参数:	uint_t *cmd，需要发送的命令
+*	uint8_t *result，期望获得的结果
+	uint32_t timeOut，等待期望结果的时间
+	uint8_t isPrintf，是否打印Log
+*返回值:	无
 */
-// ÓÅ»¯ºóµÄL610 ATÖ¸Áî·¢ËÍº¯Êý£¬Ôö¼Ó»¥³âËø±£»¤
+// 优化后的L610 AT指令发送函数，增加互斥锁保护
 void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
     if (l610_mutex) osal_mutex_lock(l610_mutex);
     uart2_recv.recv_flag = 0;
@@ -108,7 +108,7 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
                 found = 1;
                 break;
             }
-            uart2_recv.recv_flag = 0; // Çå³ý±êÖ¾£¬¼ÌÐøµÈ´ýÏÂÒ»¸ö°ü
+            uart2_recv.recv_flag = 0; // 清除标志，继续等待下一个包
         }
         osal_msleep(10);
         elapsed += 10;
@@ -121,9 +121,9 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
     if (l610_mutex) osal_mutex_unlock(l610_mutex);
 }
 /*
-º¯ÊýÃû³Æ: L610_Attach
-ËµÃ÷:L610Ä£×é³õÊ¼»¯ÈëÍø
-²ÎÊý: uint8_t isPrintf:ÊÇ·ñ´òÓ¡Log;   uint8_t  isReboot:ÊÇ·ñÖØÆô;
+函数名称: L610_Attach
+说明:L610模组初始化入网
+参数: uint8_t isPrintf:是否打印Log;   uint8_t  isReboot:是否重启;
 */
 
 void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
@@ -134,9 +134,9 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
 }
 
 /*
-º¯ÊýÃû³Æ: L610_Detach
-ËµÃ÷: L610Ä£×éÀëÍø£¨¶Ï¿ªÍøÂçÁ¬½Ó£©
-²ÎÊý: uint8_t isPrintf: ÊÇ·ñ´òÓ¡Log
+函数名称: L610_Detach
+说明: L610模组离网（断开网络连接）
+参数: uint8_t isPrintf: 是否打印Log
 */
 void L610_Detach(uint8_t isPrintf) {
 
@@ -146,13 +146,13 @@ void L610_Detach(uint8_t isPrintf) {
     if (isPrintf) printf("Detach!\r\n");
 }
 
-/********************MQTTÐ­Òé****************************/
+/********************MQTT协议****************************/
 
 /*
-º¯ÊýÃû³Æ: L610_MQTTUSER
-ËµÃ÷: L610ÓÃ»§ÉèÖÃ
-²ÎÊý: UsernameÓÃ»§Ãû£¬PasswordÓÃ»§ÃÜÂë£¬ClientIDStr¿Í»§¶ËID
-·µ»ØÖµ:ÎÞ
+函数名称: L610_MQTTUSER
+说明: L610用户设置
+参数: Username用户名，Password用户密码，ClientIDStr客户端ID
+返回值:无
 */
 
 void L610_MQTTUSER(char *Username, char *Password, char *ClientIDStr){
@@ -183,7 +183,7 @@ void L610_MQTTPub(char *topic, char *msg) {
     L610_SendCmd(msgSend, "", DefaultTimeout, isPrintf);
 }
 
-// »ªÎªÔÆÆ½Ì¨MQTTÁ¬½Ó
+// 华为云平台MQTT连接
 void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *password, int keepalive, int cleanSession) {
     memset(cmdSend, 0, sizeof(cmdSend));
     snprintf(cmdSend, sizeof(cmdSend),
@@ -192,11 +192,11 @@ void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *passwor
     L610_SendCmd(cmdSend, "OK", 5000, isPrintf);
 }
 
-// »ªÎªÔÆÆ½Ì¨ÉÏ±¨Êý¾Ý
+// 华为云平台上报数据
 void L610_HuaweiCloudReport(char *topic, char *payload) {
     memset(cmdSend, 0, sizeof(cmdSend));
-    int payload_len = strlen(payload); // Ö»ËãÔ­Ê¼JSON³¤¶È
-    // ¹¹Ôì×ªÒåºóµÄpayload
+    int payload_len = strlen(payload); // 只算原始JSON长度
+    // 构造转义后的payload
     char payload_escaped[1024] = {0};
     int j = 0;
     for (int i = 0; payload[i] != '\0' && j < sizeof(payload_escaped) - 1; i++) {
@@ -214,12 +214,12 @@ void L610_HuaweiCloudReport(char *topic, char *payload) {
     L610_SendCmd(cmdSend, "OK", 2000, isPrintf);
 }
 
-/********************TCPÐ­Òé****************************/
+/********************TCP协议****************************/
 /*
-º¯ÊýÃû³Æ: L610_OpenSocket
-ËµÃ÷: L610ÇëÇóIP²¢´ò¿ªSocketÁ¬½ÓServer
-²ÎÊý:server_ip,·þÎñÆ÷IP   server_port,·þÎñÆ÷¶Ë¿Ú
-·µ»ØÖµ:ÎÞ
+函数名称: L610_OpenSocket
+说明: L610请求IP并打开Socket连接Server
+参数:server_ip,服务器IP   server_port,服务器端口
+返回值:无
 */
 void L610_OpenSocket_TCP(char *server_ip, char *server_port) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -227,10 +227,10 @@ void L610_OpenSocket_TCP(char *server_ip, char *server_port) {
 	L610_SendCmd(cmdSend, "+MIPOPEN:", DefaultTimeout, isPrintf);
 }
 
-/*º¯ÊýÃû³Æ: L610_SendMsgToTCPServer
-*ËµÃ÷: L610Ä£×é·¢ËÍÏûÏ¢µ½TCP·þÎñÆ÷
-*²ÎÊý: *msg,´ý·¢ËÍµÄÊý¾Ý
-*·µ»ØÖµ:ÎÞ
+/*函数名称: L610_SendMsgToTCPServer
+*说明: L610模组发送消息到TCP服务器
+*参数: *msg,待发送的数据
+*返回值:无
 */
 void L610_SendMsgToTCPServer(char *msg) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -243,12 +243,12 @@ void L610_SendMsgToTCPServer(char *msg) {
 }
 
 
-/********************UDPÐ­Òé****************************/
+/********************UDP协议****************************/
 /*
-º¯ÊýÃû³Æ: L610_OpenSocket
-ËµÃ÷: L610ÇëÇóIP²¢´ò¿ªSocketÁ¬½ÓServer
-²ÎÊý:server_ip,·þÎñÆ÷IP   server_port,·þÎñÆ÷¶Ë¿Ú
-·µ»ØÖµ:ÎÞ
+函数名称: L610_OpenSocket
+说明: L610请求IP并打开Socket连接Server
+参数:server_ip,服务器IP   server_port,服务器端口
+返回值:无
 */
 void L610_OpenSocket_UDP(char *server_ip, char *server_port) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -256,10 +256,10 @@ void L610_OpenSocket_UDP(char *server_ip, char *server_port) {
 	L610_SendCmd(cmdSend, "+MIPOPEN:", DefaultTimeout, isPrintf);
 }
 
-/*º¯ÊýÃû³Æ: L610_SendMsgToTCPServer
-*ËµÃ÷: L610Ä£×é·¢ËÍÏûÏ¢µ½UDP·þÎñÆ÷
-*²ÎÊý: *msg,´ý·¢ËÍµÄÊý¾Ý:HEX¸ñÊ½
-*·µ»ØÖµ:ÎÞ
+/*函数名称: L610_SendMsgToTCPServer
+*说明: L610模组发送消息到UDP服务器
+*参数: *msg,待发送的数据:HEX格式
+*返回值:无
 */
 void L610_SendMsgToUDPServer(char *msg) {
 	memset(cmdSend, 0, sizeof(cmdSend));
@@ -282,7 +282,7 @@ void L610_SendToken(char *token) {
 void L610_Reset(void) {
     if (l610_mutex) osal_mutex_lock(l610_mutex);
     L610_SendCmd((uint8_t *) "AT+CFUN=1,1\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
-    osal_msleep(5000); // µÈ´ýÖØÆôÍê³É
+    osal_msleep(5000); // 等待重启完成
     if (l610_mutex) osal_mutex_unlock(l610_mutex);
     printf("L610 Reset!\r\n");
 }

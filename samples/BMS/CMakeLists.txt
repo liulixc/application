@@ -14,6 +14,10 @@ if(DEFINED CONFIG_SAMPLE_SUPPORT_HTTP)
     add_subdirectory_if_exist(wifi_http_demo)
 endif()
 
+if(DEFINED CONFIG_SAMPLE_SUPPORT_UART_OTA)
+    add_subdirectory_if_exist(UART_OTA)
+endif()
+
 
 set(PUBLIC_HEADER "${PUBLIC_HEADER}" ${HEADER_LIST} PARENT_SCOPE)
 set(SOURCES "${SOURCES}" PARENT_SCOPE)

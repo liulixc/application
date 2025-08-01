@@ -11,7 +11,7 @@
 
 
 typedef struct {
-    uint8_t recv[256]; // ÓëcÎÄ¼þ±£³ÖÒ»ÖÂ
+    uint8_t recv[256]; // 与c文件保持一致
     uint16_t recv_len;
     uint8_t recv_flag;
 } uart_recv;

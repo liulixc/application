@@ -14,23 +14,23 @@
 #include "mqtt_demo.h"
 
 #define UART_SIZE_DEFAULT 1024
-#define MAX_BMS_DEVICES 2  // Éè±¸ÊýÁ¿ÉÏÏÞ
+#define MAX_BMS_DEVICES 2  // 设备数量上限
 
 unsigned long g_msg_queue = 0;
 unsigned int g_msg_rev_size = sizeof(msg_data_t);
-/* ´®¿Ú½ÓÊÕ»º³åÇø´óÐ¡ */
+/* 串口接收缓冲区大小 */
 #define UART_RX_MAX 1024
 uint8_t uart_rx_bufferNew[UART_RX_MAX];
 
-char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // Ä¬ÈÏSSID
-char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // Ä¬ÈÏÃÜÂë
-int wifi_msg_flag = 0; // WiFiÐÞ¸Ä±êÖ¾Î»
+char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
+char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
+int wifi_msg_flag = 0; // WiFi修改标志位
 
-// Íâ²¿±äÁ¿ÉùÃ÷
+// 外部变量声明
 extern volatile environment_msg g_env_msg[MAX_BMS_DEVICES];
 extern bms_device_map_t g_bms_device_map[MAX_BMS_DEVICES];
 
-/* ´®¿Ú½ÓÊÕ»Øµ÷ */
+/* 串口接收回调 */
 void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool error)
 {
     unused(error);
@@ -44,7 +44,7 @@ void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool erro
     msg_data.value_len = length;
     osal_msg_queue_write_copy(g_msg_queue, (void *)&msg_data, g_msg_rev_size, 0);
 }
-/* ´®¿Ú³õÊ¼»¯ÅäÖÃ */
+/* 串口初始化配置 */
 static app_uart_init_config(void)
 {
     uart_buffer_config_t uart_buffer_config;
@@ -66,7 +66,7 @@ static app_uart_init_config(void)
     }
 }
 
-// ·¢ËÍÊý¾Ý°ü
+// 发送数据包
 static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
 {
     uint32_t ret = 0;
@@ -77,11 +77,11 @@ static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
     return ret;
 }
 
-// Íâ²¿ÉùÃ÷
+// 外部声明
 extern volatile environment_msg g_env_msg[];
 extern uint8_t get_active_device_count(void);
-extern bool is_device_active[12]; // Éè±¸»îÔ¾×´Ì¬Êý×é
-extern net_type_t current_net; // µ±Ç°ÍøÂç×´Ì¬
+extern bool is_device_active[12]; // 设备活跃状态数组
+extern net_type_t current_net; // 当前网络状态
 static void *monitorTX_task(char *arg)
 {
     unused(arg);
@@ -89,23 +89,23 @@ static void *monitorTX_task(char *arg)
     
     
     while (1) {
-        // ¼ì²éÊÇ·ñÓÐ»îÔ¾µÄBMSÉè±¸Á¬½Ó
+        // 检查是否有活跃的BMS设备连接
         uint8_t active_count = get_active_device_count();
         if (active_count > 0) {
-            // ´´½¨¸ùJSON¶ÔÏó
+            // 创建根JSON对象
             cJSON *root = cJSON_CreateObject();
             cJSON *devices = cJSON_CreateArray();
             
             
-            // ±éÀúËùÓÐ»îÔ¾Éè±¸
+            // 遍历所有活跃设备
         for (int i = 2; i < 12; i++) {
             if (is_device_active[i]) {
-                // Ê¹ÓÃÏàÍ¬µÄË÷Òý
+                // 使用相同的索引
                 environment_msg *env = &g_env_msg[i];
                 
-                // ´´½¨µ¥¸öÉè±¸µÄJSON
+                // 创建单个设备的JSON
                 cJSON *device = cJSON_CreateObject();
-                // Ê¹ÓÃÉè±¸ID
+                // 使用设备ID
                 char device_id[50];
                 snprintf(device_id, sizeof(device_id), "_Battery%02d", i);
                 cJSON_AddStringToObject(device, "device_id", device_id);
@@ -116,7 +116,7 @@ static void *monitorTX_task(char *arg)
                 
                 cJSON *props = cJSON_CreateObject();
                 
-                // Ìí¼ÓÎÂ¶ÈÊý×é
+                // 添加温度数组
                 cJSON *temp_array = cJSON_CreateArray();
                 char temp_buffer[16];
                 for (int t = 0; t < 5; t++) {
@@ -125,14 +125,14 @@ static void *monitorTX_task(char *arg)
                 }
                 cJSON_AddItemToObject(props, "temperature", temp_array);
                 
-                // Ìí¼ÓÆäËûÊôÐÔ
-                // Ê¹ÓÃ¸ñÊ½»¯·½Ê½ÏÞÖÆÐ¡ÊýµãºóÁ½Î»
+                // 添加其他属性
+                // 使用格式化方式限制小数点后两位
                 char num_buffer[16];
-                // ¸ñÊ½»¯µçÁ÷£¬ÏÞÖÆÎªÐ¡ÊýµãºóÁ½Î»
+                // 格式化电流，限制为小数点后两位
                 snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].current/10000.0f);
                 cJSON_AddNumberToObject(props, "current", atof(num_buffer));
                 
-                // ¸ñÊ½»¯×ÜµçÑ¹£¬ÏÞÖÆÎªÐ¡ÊýµãºóÁ½Î»
+                // 格式化总电压，限制为小数点后两位
                 snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].total_voltage/10000.0f);
                 cJSON_AddNumberToObject(props, "total_voltage", atof(num_buffer));
                 
@@ -140,16 +140,16 @@ static void *monitorTX_task(char *arg)
                 cJSON_AddNumberToObject(props, "SOC", g_env_msg[i].soc);
                 cJSON_AddNumberToObject(props, "iswifi", current_net);
                 
-                // Ìí¼Óµç³ØµçÑ¹Êý×é£¬Ã¿¸öµçÑ¹ÖµÏÞÖÆÎªÐ¡ÊýµãºóÁ½Î»
+                // 添加电池电压数组，每个电压值限制为小数点后两位
                 cJSON *cell_array = cJSON_CreateArray();
                 for (int c = 0; c < 12; c++) {
-                    // ¸ñÊ½»¯µ¥ÌåµçÑ¹£¬ÏÞÖÆÎªÐ¡ÊýµãºóÁ½Î»
+                    // 格式化单体电压，限制为小数点后两位
                     snprintf(num_buffer, sizeof(num_buffer), "%.2f", g_env_msg[i].cell_voltages[c]/10000.0f);
                     cJSON_AddItemToArray(cell_array, cJSON_CreateNumber(atof(num_buffer)));
                 }
                 cJSON_AddItemToObject(props, "cell_voltages", cell_array);
                 
-                // ×é×°JSON
+                // 组装JSON
                 cJSON_AddItemToObject(service, "properties", props);
                 cJSON_AddItemToArray(services, service);
                 cJSON_AddItemToObject(device, "services", services);
@@ -160,14 +160,14 @@ static void *monitorTX_task(char *arg)
             cJSON_AddItemToObject(root, "devices", devices);
             char *json_str = cJSON_PrintUnformatted(root);
             
-            // ·¢ËÍJSONÊý¾Ýµ½´®¿ÚÆÁ
+            // 发送JSON数据到串口屏
             uart_send_buff((uint8_t *)json_str, strlen(json_str));
             printf("monitor:%s\r\n", json_str);
                 
             cJSON_free(json_str);
         
             
-            // ÊÍ·Å×ÊÔ´
+            // 释放资源
             cJSON_Delete(root);
         } else {
             printf("bms null\r\n");
@@ -180,9 +180,9 @@ static void *monitorTX_task(char *arg)
                 is_device_active[i] = false;
             }
             osal_msleep(500);
-            loop_counter = 0; // ÖØÖÃ¼ÆÊýÆ÷
+            loop_counter = 0; // 重置计数器
         }
-        osal_msleep(1000); // Ã¿¸ô1Ãë·¢ËÍÒ»´ÎÊý¾Ý
+        osal_msleep(1000); // 每隔1秒发送一次数据
     }
     return NULL;
 }
@@ -202,10 +202,10 @@ static void *monitor_task(char *arg)
         }        
         
         if (msg_data.value != NULL) {
-            //ÔÚÕâ¸öµØ·½´¦Àí´Ó´®¿ÚÆÁ½ÓÊÕµ½µÄÏûÏ¢
-            // Ê¹ÓÃcJSON½âÎöJSONÊý¾Ý
+            //在这个地方处理从串口屏接收到的消息
+            // 使用cJSON解析JSON数据
             
-            // Ìí¼Ó×Ö·û´®½áÊø·û
+            // 添加字符串结束符
             char *json_str = (char *)osal_vmalloc(msg_data.value_len + 1);
             if (json_str == NULL) {
                 printf("Failed to allocate memory for JSON string\r\n");
@@ -223,7 +223,7 @@ static void *monitor_task(char *arg)
             
             printf("Received UART message: %s\r\n", json_str);
             
-            // ½âÎöJSONÊý¾Ý
+            // 解析JSON数据
             cJSON *json = cJSON_Parse(json_str);
             if (json == NULL) {
                 printf("JSON parse failed\r\n");
@@ -232,49 +232,49 @@ static void *monitor_task(char *arg)
                 continue;
             }
             
-            // ½âÎöcmd×Ö¶Î
+            // 解析cmd字段
             cJSON *cmd = cJSON_GetObjectItem(json, "command");
             if (cJSON_IsNumber(cmd)) {
                 int cmd_value = cmd->valueint;
                 
                 switch (cmd_value) {
-                    case MONITOR_CMD_TYPE_WIFI: // ÉèÖÃWiFiÐÅÏ¢
+                    case MONITOR_CMD_TYPE_WIFI: // 设置WiFi信息
                     {
                         printf("Processing WiFi configuration command\r\n");
                         
-                        // ½âÎöSSID
+                        // 解析SSID
                         cJSON *ssid = cJSON_GetObjectItem(json, "SSID");
                         if (!cJSON_IsString(ssid)) {
                             printf("Invalid or missing SSID field\r\n");
                         }
                         
-                        // ½âÎöÃÜÂë
+                        // 解析密码
                         cJSON *password = cJSON_GetObjectItem(json, "password");
                         if (!cJSON_IsString(password)) {
                             printf("Invalid or missing password field\r\n");
                             break;
                         }
                         
-                        // ¼ì²é³¤¶ÈÏÞÖÆ
+                        // 检查长度限制
                         if (strlen(ssid->valuestring) >= MAX_WIFI_SSID_LEN ||
                             strlen(password->valuestring) >= MAX_WIFI_PASSWORD_LEN) {
                             printf("WiFi credentials too long\r\n");
                             break;
                         }
 
-                        // ÅÐ¶ÏÊÇ·ñÓÐ±ä»¯
+                        // 判断是否有变化
                         int need_update = strcmp(g_wifi_ssid, ssid->valuestring) != 0 || strcmp(g_wifi_pwd, password->valuestring ) != 0;
                         if (need_update) {
                             if (strcpy_s(g_wifi_ssid, MAX_WIFI_SSID_LEN, ssid->valuestring) == EOK &&
                                 strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
                                 wifi_msg_flag = 1;
                                 printf("WiFi config updated - SSID: %s, Password: %s\r\n", g_wifi_ssid, g_wifi_pwd);
-                                // TODO: µ÷ÓÃWiFiÅäÖÃ¸üÐÂº¯Êý£¬ÖØÐÂÁ¬½ÓWiFi
+                                // TODO: 调用WiFi配置更新函数，重新连接WiFi
                             } else {
                                 printf("Failed to update WiFi configuration\r\n");
                             }
                         } else {
-                            printf("WiFiÅäÖÃÎ´±ä»¯, ²»´¥·¢ÖØÁ¬\r\n");
+                            printf("WiFi配置未变化, 不触发重连\r\n");
                         }
                         break;
                     }
@@ -289,7 +289,7 @@ static void *monitor_task(char *arg)
                 printf("Invalid or missing cmd field\r\n");
             }
             
-            // ÇåÀí×ÊÔ´
+            // 清理资源
             cJSON_Delete(json);
             osal_vfree(json_str);
             osal_vfree(msg_data.value);
