@@ -287,3 +287,89 @@ void L610_Reset(void) {
     printf("L610 Reset!\r\n");
 }
 
+/**
+ * @brief 4G网络批量上报BMS设备数据
+ * @param gate_report_topic 网关上报主题
+ * @param g_env_msg 环境消息数组
+ * @param is_device_active 设备活跃状态数组
+ * @param get_active_device_count 获取活跃设备数量的函数指针
+ * @return 成功上报的设备数量
+ */
+int L610_PublishBMSDevices(const char *gate_report_topic, volatile void *g_env_msg, bool *is_device_active, uint8_t (*get_active_device_count)(void)) {
+    // 外部类型定义，需要包含mqtt_demo.h或在此处重新定义
+    typedef struct {
+        int temperature[5]; // 温度
+        int current;     // 电流
+        int cell_voltages[12]; // 电池电压
+        int total_voltage; // 总电压
+        uint8_t soc; // SOC
+        uint8_t level; // 节点层级
+        char child[32]; // 子节点MAC地址后两位
+    } environment_msg;
+    
+    volatile environment_msg *env_msg = (volatile environment_msg *)g_env_msg;
+    
+    // 检查是否有活跃的BMS设备连接
+    uint8_t active_count = get_active_device_count();
+    if (active_count > 0) {
+        // 4G网络由于AT指令长度限制，采用单设备网关格式逐个上报
+        int published_count = 0;
+        
+        // 遍历所有活跃设备，单独上报每个设备（保持网关格式）
+        for (int i = 0; i < 12; i++) {
+            if (is_device_active[i]) {
+                
+                // 使用sprintf构建网关格式的JSON字符串
+                static char json_buffer[512]; // 单设备JSON缓冲区，足够容纳一个设备的数据
+                char temp_str[128], cell_str[256]; // 临时字符串缓冲区
+                
+                // 构建温度数组字符串
+                snprintf(temp_str, sizeof(temp_str), "[%d,%d,%d,%d,%d]",
+                        env_msg[i].temperature[0], env_msg[i].temperature[1],
+                        env_msg[i].temperature[2], env_msg[i].temperature[3],
+                        env_msg[i].temperature[4]);
+                
+                // 构建电池电压数组字符串
+                snprintf(cell_str, sizeof(cell_str), 
+                        "[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
+                        env_msg[i].cell_voltages[0], env_msg[i].cell_voltages[1],
+                        env_msg[i].cell_voltages[2], env_msg[i].cell_voltages[3],
+                        env_msg[i].cell_voltages[4], env_msg[i].cell_voltages[5],
+                        env_msg[i].cell_voltages[6], env_msg[i].cell_voltages[7],
+                        env_msg[i].cell_voltages[8], env_msg[i].cell_voltages[9],
+                        env_msg[i].cell_voltages[10], env_msg[i].cell_voltages[11]);
+                
+                // 构建完整的网关格式JSON（修改child字段格式）
+                snprintf(json_buffer, sizeof(json_buffer),
+                        "{\"devices\":[{\"device_id\":\"680b91649314d11851158e8d_Battery%02d\",\"services\":[{\"service_id\":\"ws63\","
+                        "\"properties\":{\"temperature\":%s,\"current\":%d,\"total_voltage\":%d,"
+                        "\"SOC\":%d,\"cell_voltages\":%s,\"level\":%d,\"child\":\"%s\"}}]}]}",  // child改为字符串格式
+                        i, temp_str, 
+                        env_msg[i].current, env_msg[i].total_voltage, env_msg[i].soc, cell_str,
+                        env_msg[i].level, env_msg[i].child);  // 使用字符串格式
+                
+                char *json_str = json_buffer;
+                
+                printf("[4G] Publishing gateway device 680b91649314d11851158e8d_Battery%02d", i);
+                
+                if (gate_report_topic && json_str) {
+                    L610_HuaweiCloudReport((char*)gate_report_topic, json_str);
+                    published_count++;
+                    printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d 4G上报成功\r\n", i);
+                    
+                    // 设备间上报延时，避免L610模块负载过大
+                    osal_msleep(200);
+                } else {
+                    printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d JSON生成或发送失败\r\n", i);
+                }
+            }
+        }
+        
+        printf("[L610] 4G网关单设备上报完成,成功上报设备数量:%d/%d\r\n", published_count, active_count);
+        return published_count;
+    } else {
+        printf("[L610] 跳过数据上报:无活跃BMS设备连接\r\n");
+        return 0;
+    }
+}
+

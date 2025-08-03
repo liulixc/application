@@ -31,7 +31,7 @@
 // #define SERVER_HOST   "quan.suning.com"
 #define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
 static const char *g_request = 
-    "GET /test.fwpkg HTTP/1.1\r\n"
+    "GET /test.bin HTTP/1.1\r\n"
     "Host: 1.13.92.135:8080\r\n"  // 必须添加 Host 头
     "Connection: close\r\n"
     "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
@@ -208,7 +208,7 @@ int http_clienti_get(const char *argument) {
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         upg_watchdog_kick();
         
-        // osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
+        osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         
         if (bytes_received == 0) {
             osal_printk("[ota task] : recv 0 bytes, connection closed\r\n");
@@ -243,12 +243,12 @@ int http_clienti_get(const char *argument) {
         total_recieved += write_size;
         // osal_printk("[ota task] : after write, total_received=%d\r\n", total_recieved);
         
-        // 添加数据完整性检查（按照开发指南建议）
-        if (total_recieved % 1024 == 0 || total_recieved == file_size) {
-            int progress_percent = (total_recieved * 100) / file_size;
-            osal_printk("[ota task] : progress checkpoint: %d/%d (%d%%)\r\n", 
-                       total_recieved, file_size, progress_percent);
-        }
+        // // 添加数据完整性检查（按照开发指南建议）
+        // if (total_recieved % 1024 == 0 || total_recieved == file_size) {
+        //     int progress_percent = (total_recieved * 100) / file_size;
+        //     osal_printk("[ota task] : progress checkpoint: %d/%d (%d%%)\r\n", 
+        //                total_recieved, file_size, progress_percent);
+        // }
 
         // 超量保护（防止循环条件失效）
         if (total_recieved > file_size) 

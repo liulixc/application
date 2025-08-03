@@ -1,33 +1,4 @@
-/**
- * @file mqtt_demo.c
- * @brief MQTT客户端示例程序
- * @details 实现了MQTT客户端的基本功能，包括：
- *          - 连接到华为云IoT平台
- *          - 订阅和发布消息
- *          - 环境数据采集和上报
- */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-// 引入MQTT和操作系统相关头文件
-#include "MQTTClient.h"
-#include "MQTTClientPersistence.h"
-#include "osal_debug.h"
-#include "MQTTClient.h"
-#include "los_memory.h"
-#include "los_task.h"
-#include "soc_osal.h"
-#include "app_init.h"
-#include "common_def.h"
-#include "wifi_connect.h"
-#include "watchdog.h"
-#include "cJSON.h"  // 包含cJSON库头文件
 #include "mqtt_demo.h"
-#include "l610.h"
-#include "sle_client.h"  // 包含SLE客户端头文件，提供设备映射结构定义
-#include "monitor.h"
 
 // ======================== 配置参数 ========================
 
@@ -44,18 +15,8 @@ extern char g_wifi_ssid[MAX_WIFI_SSID_LEN]; // 默认SSID
 extern char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN]; // 默认密码
 
 
-// 任务相关配置
-#define MQTT_STA_TASK_PRIO 17           // MQTT任务优先级
-#define MQTT_STA_TASK_STACK_SIZE 0x2000 // MQTT任务栈大小
-#define TIMEOUT 10000L                  // 超时时间：10秒
-
-// 最大支持8个BMS设备已在sle_client.h中定义
-
 // ======================== 全局变量定义 ========================
 
-/**
- * @brief 全局变量定义
- */
 volatile MQTTClient_deliveryToken deliveredtoken;  // 消息投递令牌
 // 设备认证信息
 char *g_username = "680b91649314d11851158e8d_Battery01"; // 设备ID
@@ -91,13 +52,6 @@ volatile environment_msg g_env_msg[MAX_BMS_DEVICES];
 
 
 // ======================== 回调函数实现 ========================
-
-/**
- * @brief 消息投递回调函数
- * @param context 上下文信息（未使用）
- * @param dt 投递令牌
- * @details 当消息成功投递到MQTT服务器时被调用
- */
 void delivered(void *context, MQTTClient_deliveryToken dt)
 {
     unused(context);
@@ -105,15 +59,6 @@ void delivered(void *context, MQTTClient_deliveryToken dt)
     deliveredtoken = dt;
 }
 
-/**
- * @brief 消息到达回调函数
- * @param context 上下文信息（未使用）
- * @param topic_name 消息主题
- * @param topic_len 主题长度
- * @param message MQTT消息结构体
- * @return 1表示成功处理，-1表示处理失败
- * @note 该函数负责处理接收到的MQTT消息，并将消息写入消息队列
- */
 int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message *message)
 {
     unused(context);
@@ -152,12 +97,12 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
             strcpy(g_cmd_queue[tail_index].response_id, request_id_pos);
             printf("[请求ID] 提取到request_id: %s\n", g_cmd_queue[tail_index].response_id);
         } else {
-            printf("[请求ID] request_id过长，截断处理\n");
+            printf("[请求ID] request_id过长,截断处理\n");
             strncpy(g_cmd_queue[tail_index].response_id, request_id_pos, sizeof(g_cmd_queue[tail_index].response_id) - 1);
             g_cmd_queue[tail_index].response_id[sizeof(g_cmd_queue[tail_index].response_id) - 1] = '\0';
         }
     } else {
-        printf("[请求ID] 未找到request_id，使用默认值\n");
+        printf("[请求ID] 未找到request_id,使用默认值\n");
         strcpy(g_cmd_queue[tail_index].response_id, "default_request_id");
     }
     
@@ -165,16 +110,10 @@ int msgArrved(void *context, char *topic_name, int topic_len, MQTTClient_message
     g_cmd_queue_tail = (g_cmd_queue_tail + 1) % MAX_CMD_QUEUE_SIZE;
     g_cmd_queue_count++;
     
-    printf("[命令队列] 命令已入队，队列长度: %d，消息内容: %s\n", g_cmd_queue_count, g_cmd_queue[tail_index].cmd_msg.receive_payload);
+    printf("[命令队列] 命令已入队，队列长度: %d,消息内容: %s\n", g_cmd_queue_count, g_cmd_queue[tail_index].cmd_msg.receive_payload);
     return 1;
 }
 
-/**
- * @brief MQTT连接断开回调函数
- * @param context 上下文信息（未使用）
- * @param cause 断开连接的原因
- * @details 当MQTT连接丢失时被调用
- */
 void connlost(void *context, char *cause)
 {
     unused(context);
@@ -263,12 +202,6 @@ int mqtt_publish_multi_device(const char *topic)
     return rc;
 }
 
-/**
- * @brief 发布MQTT消息
- * @param topic 发布的主题
- * @param payload 消息内容
- * @return 0表示成功，其他值表示失败
- */
 int mqtt_publish(const char *topic, const char *payload)
 {
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
@@ -290,11 +223,6 @@ int mqtt_publish(const char *topic, const char *payload)
     return rc;
 }
 
-/**
- * @brief 订阅MQTT主题
- * @param topic 要订阅的主题
- * @return 0表示成功，其他值表示失败
- */
 int mqtt_subscribe(const char *topic)
 {
     printf("subscribe start\r\n");
@@ -307,12 +235,6 @@ int mqtt_subscribe(const char *topic)
     return rc;
 }
 
-/**
- * @brief 连接MQTT服务器
- * @return MQTTCLIENT_SUCCESS表示成功，-1表示失败
- * @note 该函数会初始化MQTT客户端，设置连接参数并建立连接
- *       同时会注册消息回调函数用于处理收到的消息
- */
 int mqtt_connect(void)
 {
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
@@ -375,7 +297,7 @@ int switch_to_wifi(const char *ssid, const char *psk)
             printf("[网络切换] MQTT连接失败\n");
         }
         if (current_net == NET_TYPE_4G) {
-        printf("[网络切换] 断开4G，准备连接WiFi...\n");
+        printf("[网络切换] 断开4G,准备连接WiFi...\n");
         L610_Detach(1);         // 断开4G
         }
         current_net = NET_TYPE_WIFI;
@@ -409,23 +331,12 @@ void switch_to_4g(void)
 
 // ======================== 任务实现 ========================
 
-/**
- * @brief MQTT任务主函数
- * @return 执行结果，0表示成功，其他值表示失败
- * @note 该任务负责：
- *       1. 连接WiFi网络
- *       2. 建立MQTT连接
- *       3. 订阅命令主题
- *       4. 处理消息队列中的数据
- */
 int mqtt_task(void)
 {
     
     app_uart_init_config();// 初始化4G串口
     int ret = 0;
-    char *beep_status = NULL;
     int loop_counter = 0; // 循环计数器，用于控制WiFi检查间隔
-    int wifi_retry_counter = 0; // WiFi重试计数器
     
     // 连接WiFi
     if (wifi_connect(g_wifi_ssid, g_wifi_pwd) != 0) {
@@ -439,6 +350,7 @@ int mqtt_task(void)
             printf("connect failed, result %d\n", ret);
         }
         osal_msleep(1000); // 等待连接成功
+        
         // 组合命令主题字符串
         char *cmd_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/commands/#");
         if (cmd_topic) {
@@ -447,10 +359,9 @@ int mqtt_task(void)
         } else {
             printf("combine_strings failed for cmd_topic\n");
         }
-    }
-    
-    // 组合上报主题字符串
-    char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
+
+    // // 组合上报主题字符串
+    // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
 
     // 组合上报主题字符串
     char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
@@ -459,11 +370,11 @@ int mqtt_task(void)
     while (1) {
         // 检查WiFi配置是否发生变化
         if (wifi_msg_flag) {
-            printf("[WiFi重连] 检测到WiFi配置变化，开始重连流程\n");
+            printf("[WiFi重连] 检测到WiFi配置变化,开始重连流程\n");
             if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
                     printf("[网络管理] 成功连接并切换到WiFi模式\\n");
                 } else {
-                    printf("[网络管理] 连接WiFi失败，继续使用4G\\n");
+                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
                 }
             // 清除WiFi配置变化标志
             wifi_msg_flag = 0;
@@ -500,17 +411,15 @@ int mqtt_task(void)
                 if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
                     printf("[网络管理] 成功连接并切换到WiFi模式\\n");
                 } else {
-                    printf("[网络管理] 连接WiFi失败，继续使用4G\\n");
+                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
                 }
             }
         }
 
-        
-        
         // 根据当前网络类型选择上报方式
         if (current_net == NET_TYPE_WIFI) {
             if (!check_wifi_status()) {
-                    printf("[网络管理] WiFi发布失败且WiFi已断开，切换到4G模式\n");
+                    printf("[网络管理] WiFi发布失败且WiFi已断开,切换到4G模式\n");
                     switch_to_4g();
                     continue; // 跳过本次循环，等待4G连接
                 }
@@ -522,72 +431,14 @@ int mqtt_task(void)
                 if (mqtt_publish_multi_device(gate_report_topic) != MQTTCLIENT_SUCCESS) {
                     printf("WiFi MQTT多设备发布失败\r\n");
                 } else {
-                    printf("WiFi MQTT多设备发布成功，活跃设备数量：%d\r\n", active_count);
+                    printf("WiFi MQTT多设备发布成功,活跃设备数量:%d\r\n", active_count);
                 }
             } else {
-                printf("[MQTT] 跳过数据上报：无活跃BMS设备连接\r\n");
+                printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
             }        
         } else if (current_net == NET_TYPE_4G) {
-            // 检查是否有活跃的BMS设备连接
-            uint8_t active_count = get_active_device_count();
-            if (active_count > 0) {
-                // 4G网络由于AT指令长度限制，采用单设备网关格式逐个上报
-                int published_count = 0;
-                
-                // 遍历所有活跃设备，单独上报每个设备（保持网关格式）
-                for (int i = 0; i < 12; i++) {
-                    if (is_device_active[i]) {
-                        
-                        // 使用sprintf构建网关格式的JSON字符串
-                        static char json_buffer[512]; // 单设备JSON缓冲区，足够容纳一个设备的数据
-                        char temp_str[128], cell_str[256]; // 临时字符串缓冲区
-                        
-                        // 构建温度数组字符串
-                        snprintf(temp_str, sizeof(temp_str), "[%d,%d,%d,%d,%d]",
-                                g_env_msg[i].temperature[0], g_env_msg[i].temperature[1],
-                                g_env_msg[i].temperature[2], g_env_msg[i].temperature[3],
-                                g_env_msg[i].temperature[4]);
-                        
-                        // 构建电池电压数组字符串
-                        snprintf(cell_str, sizeof(cell_str), 
-                                "[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
-                                g_env_msg[i].cell_voltages[0], g_env_msg[i].cell_voltages[1],
-                                g_env_msg[i].cell_voltages[2], g_env_msg[i].cell_voltages[3],
-                                g_env_msg[i].cell_voltages[4], g_env_msg[i].cell_voltages[5],
-                                g_env_msg[i].cell_voltages[6], g_env_msg[i].cell_voltages[7],
-                                g_env_msg[i].cell_voltages[8], g_env_msg[i].cell_voltages[9],
-                                g_env_msg[i].cell_voltages[10], g_env_msg[i].cell_voltages[11]);
-                        
-                        // 构建完整的网关格式JSON（修改child字段格式）
-                        snprintf(json_buffer, sizeof(json_buffer),
-                                "{\"devices\":[{\"device_id\":\"680b91649314d11851158e8d_Battery%02d\",\"services\":[{\"service_id\":\"ws63\","
-                                "\"properties\":{\"temperature\":%s,\"current\":%d,\"total_voltage\":%d,"
-                                "\"SOC\":%d,\"cell_voltages\":%s,\"level\":%d,\"child\":\"%s\"}}]}]}",  // child改为字符串格式
-                                i, temp_str, 
-                                g_env_msg[i].current, g_env_msg[i].total_voltage, g_env_msg[i].soc, cell_str,
-                                g_env_msg[i].level, g_env_msg[i].child);  // 使用字符串格式
-                        
-                        char *json_str = json_buffer;
-                        
-                        printf("[4G] Publishing gateway device 680b91649314d11851158e8d_Battery%02d", i);
-                        
-                        if (gate_report_topic && json_str) {
-                            L610_HuaweiCloudReport(gate_report_topic, json_str);
-                            published_count++;
-                            printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d 4G上报成功\r\n", i);
-                            
-                            // 设备间上报延时，避免L610模块负载过大
-                            osal_msleep(200);
-                        } else {
-                            printf("[L610] 网关设备 680b91649314d11851158e8d_Battery%02d JSON生成或发送失败\r\n", i);
-                        }
-                    }
-                }
-                
-                printf("[L610] 4G网关单设备上报完成，成功上报设备数量：%d/%d\r\n", published_count, active_count);
-            } else {
-                printf("[L610] 跳过数据上报：无活跃BMS设备连接\r\n");
-            }
+            // 调用封装的4G数据上报函数
+            L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
         }
         
         osal_msleep(500);
@@ -597,14 +448,12 @@ int mqtt_task(void)
     return ret;
 }
 
-// ======================== MQTT示例程序入口函数 ========================
-/**
- * @brief MQTT示例程序入口函数
- * @note 该函数负责：
- *       1. 创建消息队列
- *       2. 创建MQTT任务和环境数据采集任务
- *       3. 设置任务优先级
- */
+
+// 任务相关配置
+#define MQTT_STA_TASK_PRIO 17           // MQTT任务优先级
+#define MQTT_STA_TASK_STACK_SIZE 0x2000 // MQTT任务栈大小
+#define TIMEOUT 10000L                  // 超时时间：10秒
+
 static void mqtt_sample_entry(void)
 {
     uint32_t ret;
@@ -627,9 +476,8 @@ static void mqtt_sample_entry(void)
         osal_kthread_set_priority(task_handle, MQTT_STA_TASK_PRIO);
         osal_kfree(task_handle);
     }
-    // 解锁
     osal_kthread_unlock();
 }
 
-/* 入口点：通过app_run启动mqtt_sample_entry */
+// 程序入口点
 app_run(mqtt_sample_entry);

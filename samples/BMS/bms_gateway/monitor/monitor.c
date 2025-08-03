@@ -45,7 +45,7 @@ void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool erro
     osal_msg_queue_write_copy(g_msg_queue, (void *)&msg_data, g_msg_rev_size, 0);
 }
 /* 串口初始化配置 */
-static app_uart_init_config(void)
+void monitor_uart_init_config(void)
 {
     uart_buffer_config_t uart_buffer_config;
     uapi_pin_set_mode(CONFIG_UART_TXD_PIN, CONFIG_UART_PIN_MODE);
@@ -67,7 +67,7 @@ static app_uart_init_config(void)
 }
 
 // 发送数据包
-static uint32_t uart_send_buff(uint8_t *str, uint16_t len)
+uint32_t monitor_uart_send_buff(uint8_t *str, uint16_t len)
 {
     uint32_t ret = 0;
     ret = uapi_uart_write(CONFIG_UART_ID, str, len, 0xffffffff);
@@ -85,9 +85,6 @@ extern net_type_t current_net; // 当前网络状态
 static void *monitorTX_task(char *arg)
 {
     unused(arg);
-    
-    
-    
     while (1) {
         // 检查是否有活跃的BMS设备连接
         uint8_t active_count = get_active_device_count();
@@ -95,7 +92,6 @@ static void *monitorTX_task(char *arg)
             // 创建根JSON对象
             cJSON *root = cJSON_CreateObject();
             cJSON *devices = cJSON_CreateArray();
-            
             
             // 遍历所有活跃设备
         for (int i = 2; i < 12; i++) {
@@ -161,7 +157,7 @@ static void *monitorTX_task(char *arg)
             char *json_str = cJSON_PrintUnformatted(root);
             
             // 发送JSON数据到串口屏
-            uart_send_buff((uint8_t *)json_str, strlen(json_str));
+            monitor_uart_send_buff((uint8_t *)json_str, strlen(json_str));
             printf("monitor:%s\r\n", json_str);
                 
             cJSON_free(json_str);
@@ -190,7 +186,7 @@ static void *monitorTX_task(char *arg)
 static void *monitor_task(char *arg)
 {
     unused(arg);
-    app_uart_init_config();
+    monitor_uart_init_config();
     while (1) {
         msg_data_t msg_data = {0};
         int msg_ret = osal_msg_queue_read_copy(g_msg_queue, &msg_data, &g_msg_rev_size, OSAL_WAIT_FOREVER);
@@ -282,7 +278,7 @@ static void *monitor_task(char *arg)
                     default:
                         // printf("Unknown command: %d\r\n", cmd_value);
                         // char response[] = "{\"status\":\"error\",\"msg\":\"unknown_command\"}\n";
-                        // uart_send_buff((uint8_t *)response, strlen(response));
+                        // monitor_uart_send_buff((uint8_t *)response, strlen(response));
                         break;
                 }
             } else {

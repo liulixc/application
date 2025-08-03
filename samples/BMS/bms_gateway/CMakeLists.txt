@@ -1,5 +1,5 @@
-# ÉèÖÃÔ´ÎÄ¼þÁÐ±í
-# °üº¬WiFiÁ¬½Ó¡¢MQTT¡¢cJSON½âÎö¡¢
+# è®¾ç½®æºæ–‡ä»¶åˆ—è¡¨
+# åŒ…å«WiFiè¿žæŽ¥ã€MQTTã€cJSONã€OTAç­‰æ¨¡å—
 set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/wifi/wifi_connect.c
     ${CMAKE_CURRENT_SOURCE_DIR}/mqtt_demo.c
@@ -7,10 +7,11 @@ set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/l610/l610.c
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_client/sle_client.c
     ${CMAKE_CURRENT_SOURCE_DIR}/monitor/monitor.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/OTA/ota.c
 )
 
-# ÉèÖÃÍ·ÎÄ¼þÄ¿Â¼ÁÐ±í
-# °üº¬¸÷¸öÄ£¿éµÄÍ·ÎÄ¼þÂ·¾¶
+# è®¾ç½®å¤´æ–‡ä»¶ç›®å½•åˆ—è¡¨
+# åŒ…å«å„ä¸ªæ¨¡å—å¤´æ–‡ä»¶è·¯å¾„
 set(HEADER_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/wifi 
@@ -18,9 +19,8 @@ set(HEADER_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/l610
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_client
     ${CMAKE_CURRENT_SOURCE_DIR}/monitor
+    ${CMAKE_CURRENT_SOURCE_DIR}/OTA
 )
 
-# ½«±¾Ä¿Â¼µÄÔ´ÎÄ¼þÌí¼Óµ½¸¸×÷ÓÃÓòµÄSOURCES±äÁ¿
-# ½«±¾Ä¿Â¼µÄÍ·ÎÄ¼þÂ·¾¶Ìí¼Óµ½¸¸×÷ÓÃÓòµÄPUBLIC_HEADER±äÁ¿
 set(SOURCES "${SOURCES}" ${SOURCES_LIST} PARENT_SCOPE)
 set(PUBLIC_HEADER "${PUBLIC_HEADER}" ${HEADER_LIST} PARENT_SCOPE)
