@@ -360,94 +360,94 @@ int mqtt_task(void)
             printf("combine_strings failed for cmd_topic\n");
         }
 
-    // // 组合上报主题字符串
-    // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
+        // // 组合上报主题字符串
+        // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
 
-    // 组合上报主题字符串
-    char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
+        // 组合上报主题字符串
+        char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
 
 
-    while (1) {
-        // 检查WiFi配置是否发生变化
-        if (wifi_msg_flag) {
-            printf("[WiFi重连] 检测到WiFi配置变化,开始重连流程\n");
-            if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
-                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
-                } else {
-                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
-                }
-            // 清除WiFi配置变化标志
-            wifi_msg_flag = 0;
-            printf("[WiFi重连] WiFi重连流程完成\n");
-        }
-        
-        // 处理命令队列
-        if (g_cmd_queue_count > 0) {
-            // 获取队列头部命令
-            int head_index = g_cmd_queue_head;
-            cmd_queue_item_t current_cmd = g_cmd_queue[head_index];
-            
-            printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
-            
-            // 直接下发命令给所有子设备，不进行JSON解析
-            sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
-            
-            // 构建并发送响应
-            sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-            mqtt_publish(g_send_buffer, g_response_buf);
-            printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
-            
-            // 更新队列状态
-            g_cmd_queue_head = (g_cmd_queue_head + 1) % MAX_CMD_QUEUE_SIZE;
-            g_cmd_queue_count--;
-            
-            printf("[命令队列] 命令处理完成，剩余队列长度: %d\n", g_cmd_queue_count);
-        }
-        
-        // 智能网络管理逻辑
-        if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
-            if (current_net == NET_TYPE_4G) {
-                // 当前是4G模式，检查WiFi是否可用
+        while (1) {
+            // 检查WiFi配置是否发生变化
+            if (wifi_msg_flag) {
+                printf("[WiFi重连] 检测到WiFi配置变化,开始重连流程\n");
                 if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
-                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
-                } else {
-                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
+                        printf("[网络管理] 成功连接并切换到WiFi模式\\n");
+                    } else {
+                        printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
+                    }
+                // 清除WiFi配置变化标志
+                wifi_msg_flag = 0;
+                printf("[WiFi重连] WiFi重连流程完成\n");
+            }
+            
+            // 处理命令队列
+            if (g_cmd_queue_count > 0) {
+                // 获取队列头部命令
+                int head_index = g_cmd_queue_head;
+                cmd_queue_item_t current_cmd = g_cmd_queue[head_index];
+                
+                printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
+                
+                // 直接下发命令给所有子设备，不进行JSON解析
+                sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
+                
+                // 构建并发送响应
+                sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                mqtt_publish(g_send_buffer, g_response_buf);
+                printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
+                
+                // 更新队列状态
+                g_cmd_queue_head = (g_cmd_queue_head + 1) % MAX_CMD_QUEUE_SIZE;
+                g_cmd_queue_count--;
+                
+                printf("[命令队列] 命令处理完成，剩余队列长度: %d\n", g_cmd_queue_count);
+            }
+            
+            // 智能网络管理逻辑
+            if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
+                if (current_net == NET_TYPE_4G) {
+                    // 当前是4G模式，检查WiFi是否可用
+                    if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
+                        printf("[网络管理] 成功连接并切换到WiFi模式\\n");
+                    } else {
+                        printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
+                    }
                 }
             }
-        }
 
-        // 根据当前网络类型选择上报方式
-        if (current_net == NET_TYPE_WIFI) {
-            if (!check_wifi_status()) {
-                    printf("[网络管理] WiFi发布失败且WiFi已断开,切换到4G模式\n");
-                    switch_to_4g();
-                    continue; // 跳过本次循环，等待4G连接
-                }
-            
-            // 检查是否有活跃的BMS设备连接
-            uint8_t active_count = get_active_device_count();
-            if (active_count > 0) {
-                // WiFi网络使用MQTT Client上报
-                if (mqtt_publish_multi_device(gate_report_topic) != MQTTCLIENT_SUCCESS) {
-                    printf("WiFi MQTT多设备发布失败\r\n");
+            // 根据当前网络类型选择上报方式
+            if (current_net == NET_TYPE_WIFI) {
+                if (!check_wifi_status()) {
+                        printf("[网络管理] WiFi发布失败且WiFi已断开,切换到4G模式\n");
+                        switch_to_4g();
+                        continue; // 跳过本次循环，等待4G连接
+                    }
+                
+                // 检查是否有活跃的BMS设备连接
+                uint8_t active_count = get_active_device_count();
+                if (active_count > 0) {
+                    // WiFi网络使用MQTT Client上报
+                    if (mqtt_publish_multi_device(gate_report_topic) != MQTTCLIENT_SUCCESS) {
+                        printf("WiFi MQTT多设备发布失败\r\n");
+                    } else {
+                        printf("WiFi MQTT多设备发布成功,活跃设备数量:%d\r\n", active_count);
+                    }
                 } else {
-                    printf("WiFi MQTT多设备发布成功,活跃设备数量:%d\r\n", active_count);
-                }
-            } else {
-                printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
-            }        
-        } else if (current_net == NET_TYPE_4G) {
-            // 调用封装的4G数据上报函数
-            L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
+                    printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
+                }        
+            } else if (current_net == NET_TYPE_4G) {
+                // 调用封装的4G数据上报函数
+                L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
+            }
+            
+            osal_msleep(500);
+            loop_counter++;
         }
-        
-        osal_msleep(500);
-        loop_counter++;
     }
     
     return ret;
 }
-
 
 // 任务相关配置
 #define MQTT_STA_TASK_PRIO 17           // MQTT任务优先级

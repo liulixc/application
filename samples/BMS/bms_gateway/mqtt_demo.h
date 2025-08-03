@@ -21,7 +21,6 @@
 #include "l610.h"
 #include "sle_client.h"
 #include "monitor.h"
-#include "ota_huawei.h"
 
 // 网络类型枚举定义
 typedef enum {
