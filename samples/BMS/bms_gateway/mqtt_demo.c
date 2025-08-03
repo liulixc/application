@@ -389,12 +389,32 @@ int mqtt_task(void)
                 
                 printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
                 
-                // 直接下发命令给所有子设备，不进行JSON解析
-                sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
-                
-                // 构建并发送响应
-                sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                mqtt_publish(g_send_buffer, g_response_buf);
+                // 检查是否为OTA升级命令
+                if (strstr(current_cmd.cmd_msg.receive_payload, "\"command_name\":\"ota_upgrade\"") != NULL) {
+                    printf("[OTA] 收到OTA升级命令，启动OTA任务\n");
+                    
+                    // 启动OTA任务
+                    if (ota_task_start() == 0) {
+                        printf("[OTA] OTA任务启动成功\n");
+                        // 发送成功响应
+                        sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                        char ota_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_started\"}}";
+                        mqtt_publish(g_send_buffer, ota_response);
+                    } else {
+                        printf("[OTA] OTA任务启动失败\n");
+                        // 发送失败响应
+                        sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                        char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_start_failed\"}}";
+                        mqtt_publish(g_send_buffer, ota_error_response);
+                    }
+                } else {
+                    // 其他命令直接下发给子设备
+                    sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
+                    
+                    // 构建并发送响应
+                    sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                    mqtt_publish(g_send_buffer, g_response_buf);
+                }
                 printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
                 
                 // 更新队列状态

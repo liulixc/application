@@ -21,6 +21,7 @@
 #include "l610.h"
 #include "sle_client.h"
 #include "monitor.h"
+#include "ota_task.h"
 
 // 网络类型枚举定义
 typedef enum {
@@ -30,7 +31,7 @@ typedef enum {
 } net_type_t;
 
 // 最大支持的BMS设备数
-#define MAX_BMS_DEVICES 32 // 根据实际情况，网关最多可管理的设备数
+#define MAX_BMS_DEVICES 12 // 根据实际情况，网关最多可管理的设备数
 
 typedef struct {
     char receive_payload[256];
