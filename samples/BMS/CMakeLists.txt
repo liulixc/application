@@ -10,9 +10,6 @@ if(DEFINED CONFIG_SAMPLE_SUPPORT_OTA)
     add_subdirectory_if_exist(OTA)
 endif()
 
-if(DEFINED CONFIG_SAMPLE_SUPPORT_HTTP)
-    add_subdirectory_if_exist(wifi_http_demo)
-endif()
 
 if(DEFINED CONFIG_SAMPLE_SUPPORT_UART_OTA)
     add_subdirectory_if_exist(UART_OTA)

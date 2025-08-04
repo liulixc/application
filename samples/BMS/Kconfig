@@ -28,13 +28,6 @@ config SAMPLE_SUPPORT_OTA
     help
         This option means support OTA Sample.
 
-config SAMPLE_SUPPORT_HTTP
-    bool
-    prompt "Support HTTP Sample."
-    default n
-    depends on ENABLE_BMS_SAMPLE
-    help
-        This option means support HTTP Sample.
 
 config SAMPLE_SUPPORT_UART_OTA
     bool
