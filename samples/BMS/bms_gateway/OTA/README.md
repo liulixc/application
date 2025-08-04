@@ -15,35 +15,80 @@ OTA/
 
 ## 主要功能
 
-### 1. OTA准备 (`ota_prepare`)
+### 1. 动态配置管理
+- `ota_set_config`: 设置服务器IP、端口和固件路径
+- `ota_task_start_with_config`: 使用指定配置启动OTA任务
+- 支持运行时修改OTA服务器配置
+- 参数验证和错误处理
+- 状态重置机制：自动清理失败升级的状态残留，确保后续升级的可靠性
+- 直观进度显示：实时显示OTA下载进度百分比，提供清晰的升级状态反馈
+
+### 2. OTA准备 (`ota_prepare`)
 - 初始化分区模块
 - 检查升级文件大小限制
 - 准备升级环境
 
-### 2. HTTP客户端下载 (`http_clienti_get`)
+### 3. HTTP客户端下载 (`http_clienti_get`)
+- 动态构建HTTP请求
 - 通过WiFi连接到升级服务器
 - 下载升级文件
 - 实时写入升级分区
 - 完成后自动重启系统
 
-### 3. OTA任务启动 (`ota_task_start`)
+### 4. OTA任务启动
+- `ota_task_start`: 使用当前配置启动OTA任务
+- `ota_task_start_with_config`: 使用指定配置启动OTA任务
 - 创建独立的OTA任务线程
 - 可被其他模块调用启动升级流程
 
 ## 集成到MQTT网关
 
-### 命令格式
+### MQTT命令格式
 
-MQTT命令中包含以下JSON格式可触发OTA升级：
+#### 1. 使用默认配置的OTA升级
+
+```json
+{
+  "command_name": "ota_upgrade",
+  "paras": {}
+}
+```
+
+#### 2. 指定设备ID的OTA升级
 
 ```json
 {
   "command_name": "ota_upgrade",
   "paras": {
-    "version": "1.0.1"
+    "device_id": "gateway"
   }
 }
 ```
+
+#### 3. 使用完整动态配置的OTA升级
+
+```json
+{
+  "command_name": "ota_upgrade",
+  "paras": {
+    "server_ip": "1.13.92.135",
+    "server_port": 7999,
+    "firmware_path": "/api/firmware/download/test.bin",
+    "device_id": "gateway"
+  }
+}
+```
+
+**参数说明：**
+- `server_ip`: 固件服务器IP地址（字符串）
+- `server_port`: 固件服务器端口（数字）
+- `firmware_path`: 固件文件路径（字符串）
+- `device_id`: 目标设备ID（字符串）
+
+**支持的设备ID：**
+- `"gateway"` 或 `"gateway_main"`: 网关设备
+- `"all"` 或 `"*"`: 广播升级（所有设备）
+- 其他自定义设备ID
 
 ### 响应格式
 
@@ -58,13 +103,24 @@ MQTT命令中包含以下JSON格式可触发OTA升级：
 }
 ```
 
+**设备ID不匹配响应：**
+```json
+{
+  "result_code": 0,
+  "response_name": "ota_upgrade",
+  "paras": {
+    "result": "device_id_mismatch"
+  }
+}
+```
+
 **失败响应：**
 ```json
 {
   "result_code": 1,
   "response_name": "ota_upgrade",
   "paras": {
-    "result": "ota_start_failed"
+    "result": "ota_start_failed"  // 或 "invalid_params", "json_parse_failed"
   }
 }
 ```
@@ -91,21 +147,77 @@ static const char *g_request =
 
 ## 使用方法
 
-### 1. 通过MQTT命令触发（推荐）
+### 使用方法
 
-发送包含 `"command_name":"ota_upgrade"` 的MQTT命令到设备，系统会自动识别并启动OTA升级流程。
+### 1. 使用默认配置
 
-### 2. 程序内部调用
+发送包含 `"command_name":"ota_upgrade"` 的MQTT命令到设备，系统会使用默认配置启动OTA升级流程。
+
+### 2. 指定目标设备
+
+发送包含设备ID的MQTT命令，可以指定要升级的设备：
+
+```json
+{
+  "command_name": "ota_upgrade",
+  "paras": {
+    "device_id": "gateway"
+  }
+}
+```
+
+### 3. 使用完整动态配置
+
+发送包含完整OTA配置参数的MQTT命令，可以实时指定服务器地址、固件路径和目标设备：
+
+```json
+{
+  "command_name": "ota_upgrade",
+  "paras": {
+    "server_ip": "192.168.1.100",
+    "server_port": 8080,
+    "firmware_path": "/firmware/v2.0/device.bin",
+    "device_id": "gateway"
+  }
+}
+```
+
+### 代码示例
 
 ```c
 #include "OTA/ota_task.h"
 
-// 启动OTA任务
+// 方式1：使用默认配置启动OTA任务
 if (ota_task_start() == 0) {
     printf("OTA任务启动成功\n");
 } else {
     printf("OTA任务启动失败\n");
 }
+
+// 方式2：使用动态配置启动OTA任务
+if (ota_task_start_with_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == 0) {
+    printf("动态配置OTA任务启动成功\n");
+} else if (ota_task_start_with_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == -2) {
+    printf("设备ID不匹配，此设备不需要升级\n");
+} else {
+    printf("动态配置OTA任务启动失败\n");
+}
+
+// 方式3：单独设置配置后启动
+if (ota_set_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == 0) {
+    if (ota_task_start() == 0) {
+        printf("配置设置成功，OTA任务启动成功\n");
+    }
+}
+
+// 方式4：检查设备ID是否匹配
+if (ota_check_device_id("gateway")) {
+    printf("设备ID匹配，可以进行OTA升级\n");
+} else {
+    printf("设备ID不匹配，跳过OTA升级\n");
+}
+
+
 ```
 
 ## 升级流程
@@ -120,6 +232,44 @@ if (ota_task_start() == 0) {
 8. 请求系统升级
 9. 自动重启完成升级
 
+## 问题修复
+
+### 状态残留问题修复
+
+**问题描述**：当请求错误的升级包导致OTA失败后，再次请求正确的升级包仍然会失败。
+
+**原因分析**：HTTP响应头解析使用了静态变量来累积数据，失败后这些静态变量保持了上次的状态，影响后续请求。
+
+**解决方案**：
+1. 在每次HTTP请求开始时重置静态变量状态
+2. 确保每次OTA任务开始时都从干净的状态开始
+
+**修复效果**：确保每次OTA升级都是从干净的状态开始，避免历史失败对后续升级的影响。
+
+### 参数解析问题修复
+
+**问题描述**：MQTT命令中提供的参数（如 `server_port: 7998`）被忽略，系统使用默认值（如端口7999）。
+
+**原因分析**：原有的参数解析逻辑要求所有参数都必须提供才会使用动态配置，否则直接使用硬编码的默认值，导致部分提供的参数被忽略。
+
+**解决方案**：重构参数解析逻辑，对每个参数单独判断：
+- 如果参数存在且有效，使用提供的值
+- 如果参数不存在或无效，使用默认值
+- 统一调用 `ota_task_start_with_config` 函数
+
+**修复效果**：现在可以灵活地提供部分参数，系统会正确使用提供的参数值，未提供的参数使用默认值。
+
+### 进度显示优化
+
+**问题描述：** 原有的进度显示不够直观，只在特定条件下显示详细信息，用户难以了解当前升级进度。
+
+**优化方案：** 
+- 简化进度显示逻辑，每当进度百分比发生变化时立即显示
+- 使用简洁的 `[OTA进度] X%` 格式，清晰易读
+- 避免重复显示相同的百分比，减少日志冗余
+
+**优化效果：** 用户可以实时看到清晰的百分比进度，从0%到100%连续显示，提供直观的升级状态反馈。
+
 ## 注意事项
 
 1. **网络要求**：升级过程需要稳定的WiFi连接
@@ -127,6 +277,7 @@ if (ota_task_start() == 0) {
 3. **电源稳定**：升级过程中请保持电源稳定，避免断电
 4. **服务器配置**：确保升级服务器可访问且升级文件可用
 5. **任务优先级**：OTA任务使用普通优先级，不会影响其他关键任务
+6. **状态重置**：系统会自动处理状态重置，确保每次升级从干净状态开始
 
 ## 依赖模块
 
