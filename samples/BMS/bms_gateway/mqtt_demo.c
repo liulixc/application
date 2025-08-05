@@ -403,8 +403,6 @@ int mqtt_task(void)
                              cJSON *firmware_path = cJSON_GetObjectItem(paras, "firmware_path");
                              cJSON *device_id = cJSON_GetObjectItem(paras, "device_id");
                              
-                             int ota_result = -1;
-                             
                              // 提取参数，使用提供的值或默认值
                              const char *ip = (server_ip && cJSON_IsString(server_ip)) ? server_ip->valuestring : "1.13.92.135";
                              int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7999;
@@ -413,22 +411,36 @@ int mqtt_task(void)
                              
                              printf("[OTA] 使用配置: IP=%s, Port=%d, Path=%s, DeviceID=%s\n", ip, port, path, dev_id);
                              
-                             ota_result = ota_task_start_with_config(ip, port, path, dev_id);
-                            
-                            // 发送响应
-                             sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                             if (ota_result == 0) {
-                                 printf("[OTA] OTA任务启动成功\n");
-                                 char ota_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_started\"}}";
-                                 mqtt_publish(g_send_buffer, ota_response);
-                             } else if (ota_result == -2) {
-                                 printf("[OTA] 设备ID不匹配，此设备不需要升级\n");
-                                 char ota_mismatch_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"device_id_mismatch\"}}";
-                                 mqtt_publish(g_send_buffer, ota_mismatch_response);
+                             // 判断是否为网关自身的升级
+                             if (strcmp(dev_id, "gateway_main") == 0) {
+                                 // 网关自身升级
+                                 printf("[OTA] 网关自身升级\n");
+                                 int ota_result = ota_task_start_with_config(ip, port, path, dev_id);
+                                 
+                                 // 发送响应
+                                 sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                                 if (ota_result == 0) {
+                                     printf("[OTA] 网关OTA任务启动成功\n");
+                                     char ota_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_started\"}}";
+                                     mqtt_publish(g_send_buffer, ota_response);
+                                 } else if (ota_result == -2) {
+                                     printf("[OTA] 设备ID不匹配，此设备不需要升级\n");
+                                     char ota_mismatch_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"device_id_mismatch\"}}";
+                                     mqtt_publish(g_send_buffer, ota_mismatch_response);
+                                 } else {
+                                     printf("[OTA] 网关OTA任务启动失败\n");
+                                     char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_start_failed\"}}";
+                                     mqtt_publish(g_send_buffer, ota_error_response);
+                                 }
                              } else {
-                                 printf("[OTA] OTA任务启动失败\n");
-                                 char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_start_failed\"}}";
-                                 mqtt_publish(g_send_buffer, ota_error_response);
+                                 // 子设备升级，转发命令给子设备
+                                 printf("[OTA] 转发OTA升级命令给子设备: %s\n", dev_id);
+                                 sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
+                                 
+                                 // 发送响应表示命令已转发
+                                 sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                                 char forward_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"command_forwarded\"}}";
+                                 mqtt_publish(g_send_buffer, forward_response);
                              }
                         } else {
                             printf("[OTA] JSON解析失败：缺少paras字段\n");

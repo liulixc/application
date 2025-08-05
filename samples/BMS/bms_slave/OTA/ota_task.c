@@ -14,7 +14,7 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/netdb.h"
 #include "unistd.h"
-#include "../wifi/wifi_connect.h"
+#include "wifi_connect.h"
 #include "upg.h"
 #include "partition.h"
 #include "upg_porting.h"
@@ -24,109 +24,22 @@
 #define RECV_BUFFER_SIZE     1024
 #define DELAY_TIME_MS 100
 #define HTTPC_DEMO_RECV_BUFSIZE 200  
-#define MAX_REQUEST_SIZE 512
+#define SOCK_TARGET_PORT  7998
 
 #define SSID  "QQ"
 #define PASSWORD "tangyuan"
 
-// 默认OTA配置
-#define DEFAULT_SERVER_IP     "1.13.92.135"
-#define DEFAULT_SERVER_PORT   7998
-#define DEFAULT_FIRMWARE_PATH "/api/firmware/download/test.fwpkg"
-#define DEFAULT_DEVICE_ID     "gateway_main"  // 默认设备ID
+// #define SERVER_HOST   "quan.suning.com"
+#define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
+static const char *g_request = 
+    "GET /api/firmware/download/slave.fwpkg HTTP/1.1\r\n"
+    "Host: 1.13.92.135:7998\r\n"  // 必须添加 Host 头
+    "Connection: close\r\n"
+    "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
 
-// 全局OTA配置
-static ota_config_t g_ota_config = {
-    .server_ip = DEFAULT_SERVER_IP,
-    .server_port = DEFAULT_SERVER_PORT,
-    .firmware_path = DEFAULT_FIRMWARE_PATH,
-    .device_id = DEFAULT_DEVICE_ID
-};
-
-char response[HTTPC_DEMO_RECV_BUFSIZE];
 uint8_t recv_buffer[RECV_BUFFER_SIZE] = {0};
-static char g_request_buffer[MAX_REQUEST_SIZE] = {0};
 
 //*************************ota**************************//
-
-/**
- * @brief 设置OTA服务器配置
- */
-int ota_set_config(const char *ip, int port, const char *path, const char *device_id)
-{
-    if (!ip || !path || !device_id || port <= 0 || port > 65535) {
-        osal_printk("[ota task]: invalid config parameters\r\n");
-        return -1;
-    }
-    
-    // 检查字符串长度
-    if (strlen(ip) >= sizeof(g_ota_config.server_ip) || 
-        strlen(path) >= sizeof(g_ota_config.firmware_path) ||
-        strlen(device_id) >= sizeof(g_ota_config.device_id)) {
-        osal_printk("[ota task]: config string too long\r\n");
-        return -1;
-    }
-    
-    // 更新配置
-    strcpy(g_ota_config.server_ip, ip);
-    g_ota_config.server_port = port;
-    strcpy(g_ota_config.firmware_path, path);
-    strcpy(g_ota_config.device_id, device_id);
-    
-    osal_printk("[ota task]: config updated - IP:%s, Port:%d, Path:%s, DeviceID:%s\r\n", 
-                ip, port, path, device_id);
-    return 0;
-}
-
-/**
- * @brief 检查设备ID是否匹配当前设备
- */
-int ota_check_device_id(const char *device_id)
-{
-    if (!device_id) {
-        return 0;
-    }
-    
-    // 检查是否为广播升级（所有设备）
-    if (strcmp(device_id, "all") == 0 || strcmp(device_id, "*") == 0) {
-        osal_printk("[ota task]: broadcast upgrade for all devices\r\n");
-        return 1;
-    }
-    
-    // 检查是否为网关设备
-    if (strcmp(device_id, "gateway") == 0 || strcmp(device_id, "gateway_main") == 0) {
-        osal_printk("[ota task]: upgrade target is gateway device\r\n");
-        return 1;
-    }
-    
-    // 可以根据实际需求添加更多设备ID匹配逻辑
-    osal_printk("[ota task]: device ID '%s' does not match current device\r\n", device_id);
-    return 0;
-}
-
-
-/**
- * @brief 构建HTTP请求
- */
-static int build_http_request(void)
-{
-    int ret = snprintf(g_request_buffer, MAX_REQUEST_SIZE,
-        "GET %s HTTP/1.1\r\n"
-        "Host: %s:%d\r\n"
-        "Connection: close\r\n"
-        "\r\n",
-        g_ota_config.firmware_path,
-        g_ota_config.server_ip,
-        g_ota_config.server_port);
-    
-    if (ret >= MAX_REQUEST_SIZE) {
-        osal_printk("[ota task]: HTTP request too long\r\n");
-        return -1;
-    }
-    
-    osal_printk("[ota task]: HTTP request built: %s\r\n", g_request_buffer);
-    return 0;
-}
 
 errcode_t ota_prepare(uint32_t file_size)
 {
@@ -175,13 +88,6 @@ int http_clienti_get(const char *argument) {
     uint8_t first_check = 0;
     errcode_t ret = 0;
     uint32_t file_size = 0;
-    static int last_percent = -1;
-
-    // 构建HTTP请求
-    if (build_http_request() != 0) {
-        osal_printk("[ota task]: build HTTP request failed\r\n");
-        return -1;
-    }
 
     wifi_connect(SSID,PASSWORD);
     struct sockaddr_in addr = {0};
@@ -193,17 +99,17 @@ int http_clienti_get(const char *argument) {
     }
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(g_ota_config.server_port);
-    addr.sin_addr.s_addr = inet_addr(g_ota_config.server_ip);
+    addr.sin_port = htons(SOCK_TARGET_PORT);
+    addr.sin_addr.s_addr = inet_addr(SERVER_IP);
     if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0) 
     {
-        osal_printk("sock connect fail to %s:%d\r\n", g_ota_config.server_ip, g_ota_config.server_port);
+        osal_printk("sock connect fail\r\n");
         lwip_close(sockfd);
         return -1;
     }
-    osal_printk("sock connect succ to %s:%d\r\n", g_ota_config.server_ip, g_ota_config.server_port);
+    osal_printk("sock connect succ\r\n");
 
-    if (send(sockfd, g_request_buffer, strlen(g_request_buffer), 0) < 0) 
+    if (send(sockfd, g_request, strlen(g_request), 0) < 0) 
     {
         osal_printk("sock send fail\r\n");
         lwip_close(sockfd);
@@ -215,13 +121,14 @@ int http_clienti_get(const char *argument) {
     static char header_buffer[2048] = {0};  // 增大缓冲区
     static int header_offset = 0;
     static int body_data_in_first_packet = 0;  // 第一个包中包含的响应体数据长度
+    static int last_percent = -1;
     
+
     // 重置静态变量状态，避免上次失败的残留影响
     memset(header_buffer, 0, sizeof(header_buffer));
     header_offset = 0;
     body_data_in_first_packet = 0;
     last_percent = -1;  // 重置进度显示
-    
     while (!head_recv) 
     {
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
@@ -309,7 +216,6 @@ int http_clienti_get(const char *argument) {
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         upg_watchdog_kick();
         
-        // osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         
         if (bytes_received == 0) {
             osal_printk("[ota task] : recv 0 bytes, connection closed\r\n");
@@ -406,22 +312,4 @@ int ota_task_start(void)
     }
     printf("Create OTA task succ.\r\n");
     return 0;
-}
-
-int ota_task_start_with_config(const char *ip, int port, const char *path, const char *device_id)
-{
-    // 检查设备ID是否匹配
-    if (!ota_check_device_id(device_id)) {
-        printf("Device ID mismatch, OTA not applicable for this device.\r\n");
-        return -2;  // 返回特殊错误码表示设备ID不匹配
-    }
-    
-    // 设置OTA配置
-    if (ota_set_config(ip, port, path, device_id) != 0) {
-        printf("Set OTA config fail.\r\n");
-        return -1;
-    }
-    
-    // 启动OTA任务
-    return ota_task_start();
 }

@@ -18,7 +18,8 @@
  #include "sle_uuid_client.h"
  #include "sle_hybrid.h"
  #include "cJSON.h"
- #include "gpio.h"
+#include "gpio.h"
+#include "ota_task.h"
  
  #define OCTET_BIT_LEN 8
  #define UUID_LEN_2     2
@@ -321,10 +322,27 @@
         return;
     }
     
-    // 检查是否为switch命令
+    // 检查命令类型
     cJSON *command_name = cJSON_GetObjectItem(json, "command_name");
-    if (!cJSON_IsString(command_name) || strcmp(command_name->valuestring, "switch") != 0) {
-        printf("[ssaps_write_request_cbk] Not a switch command\r\n");
+    if (!cJSON_IsString(command_name)) {
+        printf("[ssaps_write_request_cbk] Missing or invalid command_name\r\n");
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 检查是否为ota_upgrade命令
+    if (strcmp(command_name->valuestring, "ota_upgrade") == 0) {
+        printf("[ssaps_write_request_cbk] OTA upgrade command received\r\n");
+        ota_task_start();
+        cJSON_Delete(json);
+        osal_vfree(json_str);
+        return;
+    }
+    
+    // 检查是否为switch命令
+    if (strcmp(command_name->valuestring, "switch") != 0) {
+        printf("[ssaps_write_request_cbk] Unknown command: %s\r\n", command_name->valuestring);
         cJSON_Delete(json);
         osal_vfree(json_str);
         return;
