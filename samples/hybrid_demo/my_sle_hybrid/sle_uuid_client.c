@@ -323,15 +323,7 @@
      ssapc_register_callbacks(&g_sle_ssapc_cbk);
  }
  
- static errcode_t sle_uuid_client_register(void)
- {
-     sle_uuid_t app_uuid = { .len = 2, .uuid = {0x12, 0x34} }; // 客户端使用一个虚拟UUID
-     errcode_t ret = ssapc_register_client(&app_uuid, &g_client_id);
-     if (ret != ERRCODE_SUCC) {
-         osal_printk("%s ssapc_register_client failed: 0x%x\r\n", SLE_CLIENT_LOG, ret);
-     }
- }
- 
+
  
  /*==============================================================================
   * 辅助函数

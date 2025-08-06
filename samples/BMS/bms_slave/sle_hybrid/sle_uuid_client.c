@@ -332,15 +332,7 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
      ssapc_register_callbacks(&g_sle_ssapc_cbk);
  }
  
- static errcode_t sle_uuid_client_register(void)
- {
-     sle_uuid_t app_uuid = { .len = 2, .uuid = {0x12, 0x34} }; // 客户端使用一个虚拟UUID
-     errcode_t ret = ssapc_register_client(&app_uuid, &g_client_id);
-     if (ret != ERRCODE_SUCC) {
-         osal_printk("%s ssapc_register_client failed: 0x%x\r\n", SLE_CLIENT_LOG, ret);
-     }
- }
- 
+
  
  /*==============================================================================
   * 辅助函数
@@ -414,10 +406,6 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
  
  void sle_hybridc_init()
  {
-     
-     uint32_t ret = sle_uuid_client_register();
-     printf("sle_uuid_client_register_errcode:%d\r\n", ret);
- 
      sle_client_ssapc_cbk_register();
  }
  

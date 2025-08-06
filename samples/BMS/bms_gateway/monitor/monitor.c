@@ -232,7 +232,6 @@ static void *monitor_task(char *arg)
             cJSON *cmd = cJSON_GetObjectItem(json, "command");
             if (cJSON_IsNumber(cmd)) {
                 int cmd_value = cmd->valueint;
-                
                 switch (cmd_value) {
                     case MONITOR_CMD_TYPE_WIFI: // 设置WiFi信息
                     {
@@ -265,7 +264,6 @@ static void *monitor_task(char *arg)
                                 strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
                                 wifi_msg_flag = 1;
                                 printf("WiFi config updated - SSID: %s, Password: %s\r\n", g_wifi_ssid, g_wifi_pwd);
-                                // TODO: 调用WiFi配置更新函数，重新连接WiFi
                             } else {
                                 printf("Failed to update WiFi configuration\r\n");
                             }
@@ -276,9 +274,6 @@ static void *monitor_task(char *arg)
                     }
                     
                     default:
-                        // printf("Unknown command: %d\r\n", cmd_value);
-                        // char response[] = "{\"status\":\"error\",\"msg\":\"unknown_command\"}\n";
-                        // monitor_uart_send_buff((uint8_t *)response, strlen(response));
                         break;
                 }
             } else {

@@ -581,19 +581,11 @@ void ssapc_notification_cbk(uint8_t client_id, uint16_t conn_id, ssapc_handle_va
      ssapc_register_callbacks(&g_sle_ssapc_cbk);
  }
  
- static void sle_client_app_register(void)
- {
-     sle_uuid_t app_uuid = { .len = 2, .uuid = {0x12, 0x34} }; // 客户端使用一个虚拟UUID
-     errcode_t ret = ssapc_register_client(&app_uuid, &g_client_id);
-     if (ret != ERRCODE_SUCC) {
-         osal_printk("%s ssapc_register_client failed: 0x%x\r\n", SLE_GATEWAY_LOG, ret);
-     }
- }
+
  
  void sle_gateway_client_init(void)
  {
      sle_callbacks_register();
-     sle_client_app_register();
      if (enable_sle() != ERRCODE_SUCC) {
          osal_printk("%s enable_sle failed!\r\n", SLE_GATEWAY_LOG);
      }

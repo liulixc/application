@@ -18,7 +18,7 @@
 // 串口id
 #define UART_ID UART_BUS_2
 /*串口接收缓冲区大小*/
-#define UART_RX_MAX 512
+#define UART_RX_MAX 1024
 uint8_t uart_rx_buffer[UART_RX_MAX];
 /* 串口接收io*/
 #define CONFIG_UART_TXD_PIN 8 
@@ -32,7 +32,7 @@ static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
 
 uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
-#define CMD_LEN 512
+#define CMD_LEN 1024
 char cmdSend[CMD_LEN];		//发送上报数据的AT指令
 uint32_t DefaultTimeout=500;//超时
 

@@ -312,7 +312,10 @@
         end--;
     }
     
-    printf("[ssaps_write_request_cbk] client_send_data: %s\r\n\r\n", json_str);
+    
+    // 打印接收到的数据和长度
+    osal_printf("[ssaps_write_request_cbk] client_send_data length: %d, data: %s\r\n\r\n", write_cb_para->length, json_str);
+    
     
     // 解析JSON命令
     cJSON *json = cJSON_Parse(json_str);
