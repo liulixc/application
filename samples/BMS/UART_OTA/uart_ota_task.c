@@ -247,14 +247,14 @@ static void uart_ota_task(void *argument)
             }
         }
         
-        // 喂狗
-        upg_watchdog_kick();
     }
 }
 
 // 创建UART OTA任务
 static void uart_ota_sample(void)
 {
+    // 禁用看门狗，防止开发阶段重启
+    uapi_watchdog_disable();
     osThreadAttr_t attr;
     attr.name = "uart_ota_task";
     attr.attr_bits = 0U;

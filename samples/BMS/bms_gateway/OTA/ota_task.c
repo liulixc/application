@@ -231,7 +231,6 @@ int http_clienti_get(const char *argument) {
             lwip_close(sockfd);
             return -1;
         }
-        upg_watchdog_kick();
 
         // 累积响应头
         if (header_offset + bytes_received < sizeof(header_buffer)) {
@@ -307,7 +306,6 @@ int http_clienti_get(const char *argument) {
     {
         memset(recv_buffer, 0, sizeof(recv_buffer));  // 清空响应体缓冲区
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
-        upg_watchdog_kick();
         
         // osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         
@@ -392,6 +390,8 @@ int http_clienti_get(const char *argument) {
  */
 int ota_task_start(void)
 {
+    // 禁用看门狗，防止开发阶段重启
+    uapi_watchdog_disable();
     osThreadAttr_t attr;
     attr.name = "OTA_task";
     attr.attr_bits = 0U;
@@ -401,10 +401,10 @@ int ota_task_start(void)
     attr.stack_size = WIFI_TASK_STACK_SIZE;
     attr.priority = osPriorityNormal;
     if (osThreadNew((osThreadFunc_t)http_clienti_get, NULL, &attr) == NULL) {
-        printf("Create OTA task fail.\r\n");
+        osal_printk("Create OTA task fail.\r\n");
         return -1;
     }
-    printf("Create OTA task succ.\r\n");
+    osal_printk("Create OTA task succ.\r\n");
     return 0;
 }
 

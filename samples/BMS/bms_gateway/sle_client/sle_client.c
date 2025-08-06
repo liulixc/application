@@ -291,57 +291,7 @@ static void sle_gateway_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_
          osal_printk("[ssap client] read cfm cbk[%d] 0x%02x\r\n", idx, read_data->data[idx]);
      }
  }
- 
-/**
- * @brief 根据MAC地址获取对应的华为云平台设备ID
- * @param mac MAC地址
- * @param device_id 输出参数，存储获取到的设备ID
- * @param max_len device_id缓冲区最大长度
- * @return 0表示成功，-1表示未找到映射
- */
-static int get_cloud_device_id_by_mac(const uint8_t *mac, char *device_id, size_t max_len)
-{
-    // 预定义的MAC地址到设备ID的映射表
-    // 格式: MAC地址(6字节) -> 华为云设备ID
-    static const struct {
-        uint8_t mac[6];
-        const char *device_id;
-    } mac_to_device_id_map[] = {
-        // 华为云平台预期的设备ID格式
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x01}, "680b91649314d11851158e8d_Battery01"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x02}, "680b91649314d11851158e8d_Battery02"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x03}, "680b91649314d11851158e8d_Battery03"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x04}, "680b91649314d11851158e8d_Battery04"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x05}, "680b91649314d11851158e8d_Battery05"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x06}, "680b91649314d11851158e8d_Battery06"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x07}, "680b91649314d11851158e8d_Battery07"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x08}, "680b91649314d11851158e8d_Battery08"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x09}, "680b91649314d11851158e8d_Battery09"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x0A}, "680b91649314d11851158e8d_Battery10"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x0B}, "680b91649314d11851158e8d_Battery11"},
-        {{0x11, 0x22, 0x33, 0x44, 0x55, 0x0C}, "680b91649314d11851158e8d_Battery12"},
-        // 添加更多映射...
-    };
 
-    // 遍历映射表查找匹配的MAC地址
-    for (size_t i = 0; i < sizeof(mac_to_device_id_map) / sizeof(mac_to_device_id_map[0]); i++) {
-        if (memcmp(mac, mac_to_device_id_map[i].mac, sizeof(mac_to_device_id_map[i].mac)) == 0) {
-            // 找到匹配项，复制设备ID并返回
-            errcode_t ret = strncpy_s(device_id, max_len, mac_to_device_id_map[i].device_id, strlen(mac_to_device_id_map[i].device_id));
-            if (ret != EOK) {
-                osal_printk("%s Failed to copy device_id for MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-                    SLE_GATEWAY_LOG, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-                return -1;
-            }
-            return 0;
-        }
-    }
-
-    osal_printk("%s Warning: No predefined mapping for MAC %02X:%02X:%02X:%02X:%02X:%02X\r\n",
-           SLE_GATEWAY_LOG, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    return -1;
-}
 
 
 // 请将此函数替换掉文件中旧的 ssapc_notification_cbk

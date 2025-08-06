@@ -405,7 +405,7 @@ int mqtt_task(void)
                              
                              // 提取参数，使用提供的值或默认值
                              const char *ip = (server_ip && cJSON_IsString(server_ip)) ? server_ip->valuestring : "1.13.92.135";
-                             int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7999;
+                             int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7998;
                              const char *path = (firmware_path && cJSON_IsString(firmware_path)) ? firmware_path->valuestring : "/api/firmware/download/test.bin";
                              const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "gateway_main";
                              

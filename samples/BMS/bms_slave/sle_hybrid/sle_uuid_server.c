@@ -472,12 +472,3 @@
          return 0;
      }
  }
- 
- 
- void sle_hybrids_wait_client_connected(void)
- {
-     while (g_sle_hybrids_conn_state != SLE_ACB_STATE_CONNECTED)
-     {
-         osal_msleep(100); 
-     }
- }

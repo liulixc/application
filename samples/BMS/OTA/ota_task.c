@@ -130,7 +130,6 @@ int http_clienti_get(const char *argument) {
             lwip_close(sockfd);
             return -1;
         }
-        upg_watchdog_kick();
 
         // 累积响应头
         if (header_offset + bytes_received < sizeof(header_buffer)) {
@@ -206,7 +205,7 @@ int http_clienti_get(const char *argument) {
     {
         memset(recv_buffer, 0, sizeof(recv_buffer));  // 清空响应体缓冲区
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
-        upg_watchdog_kick();
+
         
         osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         

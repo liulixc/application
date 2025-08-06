@@ -73,5 +73,4 @@ typedef struct{
  errcode_t sle_hybrids_init(void);
  int sle_hybrids_send_data(uint8_t *data,uint16_t length);
  uint8_t sle_hybrids_is_client_connected(void);
- void sle_hybrids_wait_client_connected(void);
  #endif
