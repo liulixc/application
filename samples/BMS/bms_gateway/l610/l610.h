@@ -34,6 +34,10 @@ void L610_OpenSocket_UDP(char *server_ip, char *server_port);
 void L610_SendMsgToUDPServer(char *msg);
 void L610_SendToken(char *token);
 void L610_Reset(void);
+
+// L610模块初始化状态管理函数
+uint8_t L610_WaitForInit(uint32_t timeout_ms);
+
 int L610_PublishBMSDevices(const char *gate_report_topic, volatile void *g_env_msg, bool *is_device_active, uint8_t (*get_active_device_count)(void));
 
 #endif

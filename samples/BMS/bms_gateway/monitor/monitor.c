@@ -12,6 +12,9 @@
 #include "monitor.h"
 #include "sle_client.h"
 #include "mqtt_demo.h"
+#include "nv_storage.h"
+#include "nv_common_cfg.h"
+#include "key_id.h"
 
 #define UART_SIZE_DEFAULT 1024
 #define MAX_BMS_DEVICES 2  // 设备数量上限
@@ -26,9 +29,59 @@ char g_wifi_ssid[MAX_WIFI_SSID_LEN] = "QQ"; // 默认SSID
 char g_wifi_pwd[MAX_WIFI_PASSWORD_LEN] = "tangyuan"; // 默认密码
 int wifi_msg_flag = 0; // WiFi修改标志位
 
+/* WiFi配置加载函数 */
+static void load_wifi_config(void)
+{
+    wifi_config_t wifi_config = {0};
+    uint32_t kvalue_length = sizeof(wifi_config_t);
+    
+    // 从NV存储读取WiFi配置
+    errcode_t ret = uapi_nv_read(NV_ID_WIFI_CONFIG, kvalue_length, &kvalue_length, (uint8_t *)&wifi_config);
+    if (ret == ERRCODE_SUCC && kvalue_length == sizeof(wifi_config_t)) {
+        // 检查读取的数据是否有效（非空字符串）
+        if (wifi_config.ssid[0] != '\0' && wifi_config.password[0] != '\0') {
+            // 确保字符串以null结尾
+            wifi_config.ssid[WIFI_SSID_MAX_LEN] = '\0';
+            wifi_config.password[WIFI_PASSWORD_MAX_LEN] = '\0';
+            
+            // 复制到全局变量
+            if (strcpy_s(g_wifi_ssid, MAX_WIFI_SSID_LEN, (char *)wifi_config.ssid) == EOK &&
+                strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, (char *)wifi_config.password) == EOK) {
+                printf("WiFi config loaded from NV - SSID: %s\r\n", g_wifi_ssid);
+            } else {
+                printf("Failed to copy WiFi config from NV\r\n");
+            }
+        } else {
+            printf("Invalid WiFi config in NV, using defaults\r\n");
+        }
+    } else {
+        printf("Failed to read WiFi config from NV (ret: 0x%x), using defaults\r\n", ret);
+    }
+}
+
+/* WiFi配置保存函数 */
+static void save_wifi_config(void)
+{
+    wifi_config_t wifi_config = {0};
+    
+    // 复制当前WiFi配置到结构体
+    if (strcpy_s((char *)wifi_config.ssid, WIFI_SSID_MAX_LEN + 1, g_wifi_ssid) != EOK ||
+        strcpy_s((char *)wifi_config.password, WIFI_PASSWORD_MAX_LEN + 1, g_wifi_pwd) != EOK) {
+        printf("Failed to prepare WiFi config for saving\r\n");
+        return;
+    }
+    
+    // 写入NV存储
+    errcode_t ret = uapi_nv_write(NV_ID_WIFI_CONFIG, (uint8_t *)&wifi_config, sizeof(wifi_config_t));
+    if (ret == ERRCODE_SUCC) {
+        printf("WiFi config saved to NV successfully\r\n");
+    } else {
+        printf("Failed to save WiFi config to NV (ret: 0x%x)\r\n", ret);
+    }
+}
+
 // 外部变量声明
 extern volatile environment_msg g_env_msg[MAX_BMS_DEVICES];
-extern bms_device_map_t g_bms_device_map[MAX_BMS_DEVICES];
 
 /* 串口接收回调 */
 void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool error)
@@ -43,6 +96,7 @@ void sle_uart_client_read_handler(const void *buffer, uint16_t length, bool erro
     msg_data.value = (uint8_t *)buffer_cpy;
     msg_data.value_len = length;
     osal_msg_queue_write_copy(g_msg_queue, (void *)&msg_data, g_msg_rev_size, 0);
+    printf("monitor uart read handler, length: %d\r\n", length);
 }
 /* 串口初始化配置 */
 void monitor_uart_init_config(void)
@@ -166,7 +220,7 @@ static void *monitorTX_task(char *arg)
             // 释放资源
             cJSON_Delete(root);
         } else {
-            printf("bms null\r\n");
+            // printf("bms null\r\n");
         }
 
         static int loop_counter = 0;
@@ -264,6 +318,8 @@ static void *monitor_task(char *arg)
                                 strcpy_s(g_wifi_pwd, MAX_WIFI_PASSWORD_LEN, password->valuestring) == EOK) {
                                 wifi_msg_flag = 1;
                                 printf("WiFi config updated - SSID: %s, Password: %s\r\n", g_wifi_ssid, g_wifi_pwd);
+                                // 保存WiFi配置到NV存储
+                                save_wifi_config();
                             } else {
                                 printf("Failed to update WiFi configuration\r\n");
                             }
@@ -293,6 +349,9 @@ static void *monitor_task(char *arg)
 
 static void monitor_entry(void)
 {
+    // 加载WiFi配置
+    load_wifi_config();
+    
     osal_task *Monitor_task_handle = NULL;
     osal_task *task_handle = NULL;
     osal_kthread_lock();

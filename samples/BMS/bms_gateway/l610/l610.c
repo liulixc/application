@@ -29,6 +29,7 @@ uart_recv uart2_recv = {0};
 
 // 互斥锁用于AT指令收发保护
 static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
+static uint8_t l610_ready_flag = 0; // L610模块就绪标志位: 0-未就绪, 1-已就绪
 
 uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
@@ -57,6 +58,18 @@ void uart_read_handler(const void *buffer, uint16_t length, bool error)
     memcpy_s(uart2_recv.recv, sizeof(uart2_recv.recv), buffer, copy_len);
     uart2_recv.recv_len = copy_len;
     uart2_recv.recv_flag = 1;
+
+    // 打印接收到的数据用于调试
+    printf("[L610] Received: %.*s\r\n", copy_len, (char*)uart2_recv.recv);
+    
+    // 检查多种可能的就绪状态，重点匹配"+SIM READY"
+    if (strstr((char*)uart2_recv.recv, "READY") ) {
+        // SIM卡准备好后发送AT指令激活模块
+        printf("[L610] Sending AT command to activate module\r\n");
+        uart_send_buff((uint8_t *)"AT\r\n", 4);
+        osal_msleep(100); // 增加延时确保命令发送完成
+        l610_ready_flag = 1;
+    }
 }
 
 /* 串口初始化配置*/
@@ -79,8 +92,6 @@ void app_uart_init_config(void)
         osal_printk("uart%d int mode register receive callback succ!\r\n", UART_BUS_0);
     }
 }
-
-
 
 /*
 函数名称: L610_SendCmd
@@ -127,6 +138,15 @@ void L610_SendCmd(char *cmd, char *result, uint32_t timeOut, uint8_t isPrintf) {
 */
 
 void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
+	// 检查模块是否已初始化
+	if (!l610_ready_flag) {
+		printf("[L610] Waiting for module initialization...\r\n");
+		// 等待最多5秒钟模块初始化完成
+		if (!L610_WaitForInit(5000)) {
+			printf("[L610] Module initialization timeout, attempting attach anyway\r\n");
+		}
+	}
+	
 	if (isReboot== 1) {
 		L610_SendCmd((uint8_t *) "AT+MIPCALL=1\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
 		printf("Attach!\r\n");
@@ -148,40 +168,6 @@ void L610_Detach(uint8_t isPrintf) {
 
 /********************MQTT协议****************************/
 
-/*
-函数名称: L610_MQTTUSER
-说明: L610用户设置
-参数: Username用户名，Password用户密码，ClientIDStr客户端ID
-返回值:无
-*/
-
-void L610_MQTTUSER(char *Username, char *Password, char *ClientIDStr){
-	memset(cmdSend, 0, sizeof(cmdSend));
-	snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTUSER=1,%s,%s,%s\r\n", Username, Password, ClientIDStr);
-	L610_SendCmd(cmdSend, "OK", DefaultTimeout, isPrintf);
-}
-
-void L610_ConnetMQTT(char *server_ip, char *server_port) {
-	memset(cmdSend, 0, sizeof(cmdSend));
-	snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTOPEN=1,%s,%s,1,60\r\n", server_ip, server_port);
-	L610_SendCmd(cmdSend, "", DefaultTimeout, isPrintf);
-}
-
-void L610_MQTTSub(char *topic) {
-	memset(cmdSend, 0, sizeof(cmdSend));
-	snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTSUB=1,%s,1\r\n", topic);
-	L610_SendCmd(cmdSend, "OK", DefaultTimeout, isPrintf);
-}
-
-void L610_MQTTPub(char *topic, char *msg) {
-    memset(cmdSend, 0, sizeof(cmdSend));
-    int len = strlen(msg);
-    snprintf(cmdSend, sizeof(cmdSend), "AT+MQTTPUB=1,%s,1,0,%d\r\n", topic, len);
-    L610_SendCmd(cmdSend, "", DefaultTimeout, isPrintf);
-    char msgSend[256] = {0};
-    snprintf(msgSend, sizeof(msgSend), "%s\r\n", msg);
-    L610_SendCmd(msgSend, "", DefaultTimeout, isPrintf);
-}
 
 // 华为云平台MQTT连接
 void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *password, int keepalive, int cleanSession) {
@@ -281,11 +267,37 @@ void L610_SendToken(char *token) {
 
 void L610_Reset(void) {
     if (l610_mutex) osal_mutex_lock(l610_mutex);
+    l610_ready_flag = 0; // 重置就绪标志
     L610_SendCmd((uint8_t *) "AT+CFUN=1,1\r\n", (uint8_t *) "OK", DefaultTimeout, isPrintf);
     osal_msleep(5000); // 等待重启完成
     if (l610_mutex) osal_mutex_unlock(l610_mutex);
     printf("L610 Reset!\r\n");
 }
+
+/**
+ * @brief 等待L610模块初始化完成
+ * @param timeout_ms 超时时间(毫秒)
+ * @return 1-初始化完成, 0-超时失败
+ */
+uint8_t L610_WaitForInit(uint32_t timeout_ms) {
+    uint32_t elapsed = 0;
+    printf("[L610] Waiting for module initialization...\r\n");
+    
+    while (elapsed < timeout_ms) {
+        if (l610_ready_flag) {
+            printf("[L610] Module initialization completed (SIM ready)\r\n");
+            return 1;
+        }
+        osal_msleep(100);
+        elapsed += 100;
+    }
+    
+    printf("[L610] Module initialization timeout (SIM ready: %d)\r\n", 
+           l610_ready_flag);
+    return 0;
+}
+
+
 
 /**
  * @brief 4G网络批量上报BMS设备数据

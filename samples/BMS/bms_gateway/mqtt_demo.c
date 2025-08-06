@@ -359,161 +359,159 @@ int mqtt_task(void)
         } else {
             printf("combine_strings failed for cmd_topic\n");
         }
+    }
+    // // 组合上报主题字符串
+    // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
 
-        // // 组合上报主题字符串
-        // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
-
-        // 组合上报主题字符串
-        char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
+    // 组合上报主题字符串
+    char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
 
 
-        while (1) {
-            // 检查WiFi配置是否发生变化
-            if (wifi_msg_flag) {
-                printf("[WiFi重连] 检测到WiFi配置变化,开始重连流程\n");
-                if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
-                        printf("[网络管理] 成功连接并切换到WiFi模式\\n");
-                    } else {
-                        printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
-                    }
-                // 清除WiFi配置变化标志
-                wifi_msg_flag = 0;
-                printf("[WiFi重连] WiFi重连流程完成\n");
-            }
+    while (1) {
+        // 检查WiFi配置是否发生变化
+        if (wifi_msg_flag) {
+            printf("[WiFi重连] 检测到WiFi配置变化,开始重连流程\n");
+            if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
+                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
+                } else {
+                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
+                }
+            // 清除WiFi配置变化标志
+            wifi_msg_flag = 0;
+            printf("[WiFi重连] WiFi重连流程完成\n");
+        }
+        
+        // 处理命令队列
+        if (g_cmd_queue_count > 0) {
+            // 获取队列头部命令
+            int head_index = g_cmd_queue_head;
+            cmd_queue_item_t current_cmd = g_cmd_queue[head_index];
             
-            // 处理命令队列
-            if (g_cmd_queue_count > 0) {
-                // 获取队列头部命令
-                int head_index = g_cmd_queue_head;
-                cmd_queue_item_t current_cmd = g_cmd_queue[head_index];
+            printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
+            
+            // 检查是否为OTA升级命令
+            if (strstr(current_cmd.cmd_msg.receive_payload, "\"command_name\":\"ota_upgrade\"") != NULL) {
+                printf("[OTA] 收到OTA升级命令，解析参数\n");
                 
-                printf("[命令处理] 处理队列命令: %s\n", current_cmd.cmd_msg.receive_payload);
-                
-                // 检查是否为OTA升级命令
-                if (strstr(current_cmd.cmd_msg.receive_payload, "\"command_name\":\"ota_upgrade\"") != NULL) {
-                    printf("[OTA] 收到OTA升级命令，解析参数\n");
-                    
-                    // 解析JSON获取OTA配置参数
-                    cJSON *json = cJSON_Parse(current_cmd.cmd_msg.receive_payload);
-                    if (json != NULL) {
-                        cJSON *paras = cJSON_GetObjectItem(json, "paras");
-                         if (paras != NULL) {
-                             cJSON *server_ip = cJSON_GetObjectItem(paras, "server_ip");
-                             cJSON *server_port = cJSON_GetObjectItem(paras, "server_port");
-                             cJSON *firmware_path = cJSON_GetObjectItem(paras, "firmware_path");
-                             cJSON *device_id = cJSON_GetObjectItem(paras, "device_id");
-                             
-                             // 提取参数，使用提供的值或默认值
-                             const char *ip = (server_ip && cJSON_IsString(server_ip)) ? server_ip->valuestring : "1.13.92.135";
-                             int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7998;
-                             const char *path = (firmware_path && cJSON_IsString(firmware_path)) ? firmware_path->valuestring : "/api/firmware/download/test.bin";
-                             const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "gateway_main";
-                             
-                             printf("[OTA] 使用配置: IP=%s, Port=%d, Path=%s, DeviceID=%s\n", ip, port, path, dev_id);
-                             
-                             // 判断是否为网关自身的升级
-                             if (strcmp(dev_id, "gateway_main") == 0) {
-                                 // 网关自身升级
-                                 printf("[OTA] 网关自身升级\n");
-                                 int ota_result = ota_task_start_with_config(ip, port, path, dev_id);
-                                 
-                                 // 发送响应
-                                 sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                                 if (ota_result == 0) {
-                                     printf("[OTA] 网关OTA任务启动成功\n");
-                                     char ota_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_started\"}}";
-                                     mqtt_publish(g_send_buffer, ota_response);
-                                 } else if (ota_result == -2) {
-                                     printf("[OTA] 设备ID不匹配，此设备不需要升级\n");
-                                     char ota_mismatch_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"device_id_mismatch\"}}";
-                                     mqtt_publish(g_send_buffer, ota_mismatch_response);
-                                 } else {
-                                     printf("[OTA] 网关OTA任务启动失败\n");
-                                     char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_start_failed\"}}";
-                                     mqtt_publish(g_send_buffer, ota_error_response);
-                                 }
-                             } else {
-                                 // 子设备升级，转发命令给子设备
-                                 printf("[OTA] 转发OTA升级命令给子设备: %s\n", dev_id);
-                                 sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
-                                 
-                                 // 发送响应表示命令已转发
-                                 sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                                 char forward_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"command_forwarded\"}}";
-                                 mqtt_publish(g_send_buffer, forward_response);
-                             }
-                        } else {
-                            printf("[OTA] JSON解析失败：缺少paras字段\n");
-                            sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                            char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"invalid_params\"}}";
-                            mqtt_publish(g_send_buffer, ota_error_response);
-                        }
-                        cJSON_Delete(json);
+                // 解析JSON获取OTA配置参数
+                cJSON *json = cJSON_Parse(current_cmd.cmd_msg.receive_payload);
+                if (json != NULL) {
+                    cJSON *paras = cJSON_GetObjectItem(json, "paras");
+                        if (paras != NULL) {
+                            cJSON *server_ip = cJSON_GetObjectItem(paras, "server_ip");
+                            cJSON *server_port = cJSON_GetObjectItem(paras, "server_port");
+                            cJSON *firmware_path = cJSON_GetObjectItem(paras, "firmware_path");
+                            cJSON *device_id = cJSON_GetObjectItem(paras, "device_id");
+                            
+                            // 提取参数，使用提供的值或默认值
+                            const char *ip = (server_ip && cJSON_IsString(server_ip)) ? server_ip->valuestring : "1.13.92.135";
+                            int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7998;
+                            const char *path = (firmware_path && cJSON_IsString(firmware_path)) ? firmware_path->valuestring : "/api/firmware/download/test.bin";
+                            const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "gateway_main";
+                            
+                            printf("[OTA] 使用配置: IP=%s, Port=%d, Path=%s, DeviceID=%s\n", ip, port, path, dev_id);
+                            
+                            // 判断是否为网关自身的升级
+                            if (strcmp(dev_id, "gateway_main") == 0) {
+                                // 网关自身升级
+                                printf("[OTA] 网关自身升级\n");
+                                int ota_result = ota_task_start_with_config(ip, port, path, dev_id);
+                                
+                                // 发送响应
+                                sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                                if (ota_result == 0) {
+                                    printf("[OTA] 网关OTA任务启动成功\n");
+                                    char ota_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_started\"}}";
+                                    mqtt_publish(g_send_buffer, ota_response);
+                                } else if (ota_result == -2) {
+                                    printf("[OTA] 设备ID不匹配，此设备不需要升级\n");
+                                    char ota_mismatch_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"device_id_mismatch\"}}";
+                                    mqtt_publish(g_send_buffer, ota_mismatch_response);
+                                } else {
+                                    printf("[OTA] 网关OTA任务启动失败\n");
+                                    char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"ota_start_failed\"}}";
+                                    mqtt_publish(g_send_buffer, ota_error_response);
+                                }
+                            } else {
+                                // 子设备升级，转发命令给子设备
+                                printf("[OTA] 转发OTA升级命令给子设备: %s\n", dev_id);
+                                sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
+                                
+                                // 发送响应表示命令已转发
+                                sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                                char forward_response[] = "{\"result_code\": 0,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"command_forwarded\"}}";
+                                mqtt_publish(g_send_buffer, forward_response);
+                            }
                     } else {
-                        printf("[OTA] JSON解析失败\n");
+                        printf("[OTA] JSON解析失败：缺少paras字段\n");
                         sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                        char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"json_parse_failed\"}}";
+                        char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"invalid_params\"}}";
                         mqtt_publish(g_send_buffer, ota_error_response);
                     }
+                    cJSON_Delete(json);
                 } else {
-                    // 其他命令直接下发给子设备
-                    sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
-                    
-                    // 构建并发送响应
+                    printf("[OTA] JSON解析失败\n");
                     sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
-                    mqtt_publish(g_send_buffer, g_response_buf);
+                    char ota_error_response[] = "{\"result_code\": 1,\"response_name\": \"ota_upgrade\",\"paras\": {\"result\": \"json_parse_failed\"}}";
+                    mqtt_publish(g_send_buffer, ota_error_response);
                 }
-                printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
+            } else {
+                // 其他命令直接下发给子设备
+                sle_gateway_send_command_to_children((uint8_t*)current_cmd.cmd_msg.receive_payload, strlen(current_cmd.cmd_msg.receive_payload));
                 
-                // 更新队列状态
-                g_cmd_queue_head = (g_cmd_queue_head + 1) % MAX_CMD_QUEUE_SIZE;
-                g_cmd_queue_count--;
-                
-                printf("[命令队列] 命令处理完成，剩余队列长度: %d\n", g_cmd_queue_count);
+                // 构建并发送响应
+                sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
+                mqtt_publish(g_send_buffer, g_response_buf);
             }
+            printf("[命令响应] 已发送响应到: %s\n", g_send_buffer);
             
-            // 智能网络管理逻辑
-            if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
-                if (current_net == NET_TYPE_4G) {
-                    // 当前是4G模式，检查WiFi是否可用
-                    if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
-                        printf("[网络管理] 成功连接并切换到WiFi模式\\n");
-                    } else {
-                        printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
-                    }
-                }
-            }
-
-            // 根据当前网络类型选择上报方式
-            if (current_net == NET_TYPE_WIFI) {
-                if (!check_wifi_status()) {
-                        printf("[网络管理] WiFi发布失败且WiFi已断开,切换到4G模式\n");
-                        switch_to_4g();
-                        continue; // 跳过本次循环，等待4G连接
-                    }
-                
-                // 检查是否有活跃的BMS设备连接
-                uint8_t active_count = get_active_device_count();
-                if (active_count > 0) {
-                    // WiFi网络使用MQTT Client上报
-                    if (mqtt_publish_multi_device(gate_report_topic) != MQTTCLIENT_SUCCESS) {
-                        printf("WiFi MQTT多设备发布失败\r\n");
-                    } else {
-                        printf("WiFi MQTT多设备发布成功,活跃设备数量:%d\r\n", active_count);
-                    }
-                } else {
-                    printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
-                }        
-            } else if (current_net == NET_TYPE_4G) {
-                // 调用封装的4G数据上报函数
-                L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
-            }
+            // 更新队列状态
+            g_cmd_queue_head = (g_cmd_queue_head + 1) % MAX_CMD_QUEUE_SIZE;
+            g_cmd_queue_count--;
             
-            osal_msleep(500);
-            loop_counter++;
+            printf("[命令队列] 命令处理完成，剩余队列长度: %d\n", g_cmd_queue_count);
         }
+        
+        // 智能网络管理逻辑
+        if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
+            if (current_net == NET_TYPE_4G) {
+                // 当前是4G模式，检查WiFi是否可用
+                if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
+                    printf("[网络管理] 成功连接并切换到WiFi模式\\n");
+                } else {
+                    printf("[网络管理] 连接WiFi失败,继续使用4G\\n");
+                }
+            }
+        }
+
+        // 根据当前网络类型选择上报方式
+        if (current_net == NET_TYPE_WIFI) {
+            if (!check_wifi_status()) {
+                    printf("[网络管理] WiFi发布失败且WiFi已断开,切换到4G模式\n");
+                    switch_to_4g();
+                    continue; // 跳过本次循环，等待4G连接
+                }
+            
+            // 检查是否有活跃的BMS设备连接
+            uint8_t active_count = get_active_device_count();
+            if (active_count > 0) {
+                // WiFi网络使用MQTT Client上报
+                if (mqtt_publish_multi_device(gate_report_topic) != MQTTCLIENT_SUCCESS) {
+                    printf("WiFi MQTT多设备发布失败\r\n");
+                } else {
+                    printf("WiFi MQTT多设备发布成功,活跃设备数量:%d\r\n", active_count);
+                }
+            } else {
+                // printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
+            }        
+        } else if (current_net == NET_TYPE_4G) {
+            // 调用封装的4G数据上报函数
+            L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
+        }
+        
+        osal_msleep(500);
+        loop_counter++;
     }
-    
     return ret;
 }
 
