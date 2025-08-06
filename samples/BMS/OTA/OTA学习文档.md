@@ -194,6 +194,7 @@ upg_reboot();
 | `uapi_upg_write_package_sync()` | 同步写入固件数据 |
 | `uapi_upg_request_upgrade()` | 请求执行升级 |
 | `upg_reboot()` | 系统重启 |
+| `upg_watchdog_kick()` | 喂狗操作 |
 
 ### 网络模块 API
 

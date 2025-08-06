@@ -138,6 +138,7 @@ int http_clienti_get(const char *argument) {
             lwip_close(sockfd);
             return -1;
         }
+         upg_watchdog_kick();
         // 累积响应头
         if (header_offset + bytes_received < sizeof(header_buffer)) {
             memcpy(header_buffer + header_offset, recv_buffer, bytes_received);
@@ -213,7 +214,7 @@ int http_clienti_get(const char *argument) {
         memset(recv_buffer, 0, sizeof(recv_buffer));  // 清空响应体缓冲区
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
         
-        
+         upg_watchdog_kick();
         if (bytes_received == 0) {
             osal_printk("[ota task] : recv 0 bytes, connection closed\r\n");
             if (total_recieved == file_size) {
@@ -295,8 +296,7 @@ int http_clienti_get(const char *argument) {
  */
 int ota_task_start(void)
 {
-    // 禁用看门狗，防止开发阶段重启
-    uapi_watchdog_disable();
+
     osThreadAttr_t attr;
     attr.name = "OTA_task";
     attr.attr_bits = 0U;

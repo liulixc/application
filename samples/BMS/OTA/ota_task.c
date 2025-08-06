@@ -23,7 +23,7 @@
 #define RECV_BUFFER_SIZE     1024
 #define DELAY_TIME_MS 100
 #define HTTPC_DEMO_RECV_BUFSIZE 200  
-#define SOCK_TARGET_PORT  8080  
+#define SOCK_TARGET_PORT  7998
 
 #define SSID  "QQ"
 #define PASSWORD "tangyuan"
@@ -31,8 +31,8 @@
 // #define SERVER_HOST   "quan.suning.com"
 #define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
 static const char *g_request = 
-    "GET /test.bin HTTP/1.1\r\n"
-    "Host: 1.13.92.135:8080\r\n"  // 必须添加 Host 头
+    "GET /api/firmware/download/slave.fwpkg HTTP/1.1\r\n"
+    "Host: 1.13.92.135:7998\r\n"  // 必须添加 Host 头
     "Connection: close\r\n"
     "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
 
@@ -130,7 +130,7 @@ int http_clienti_get(const char *argument) {
             lwip_close(sockfd);
             return -1;
         }
-
+        upg_watchdog_kick();
         // 累积响应头
         if (header_offset + bytes_received < sizeof(header_buffer)) {
             memcpy(header_buffer + header_offset, recv_buffer, bytes_received);
@@ -206,7 +206,7 @@ int http_clienti_get(const char *argument) {
         memset(recv_buffer, 0, sizeof(recv_buffer));  // 清空响应体缓冲区
         int bytes_received = recv(sockfd, recv_buffer, sizeof(recv_buffer), 0);
 
-        
+         upg_watchdog_kick();
         osal_printk("[ota task] : recv bytes=%d, total=%d/%d\r\n", bytes_received, total_recieved, file_size);
         
         if (bytes_received == 0) {

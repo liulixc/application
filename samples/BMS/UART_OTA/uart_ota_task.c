@@ -110,7 +110,7 @@ void uart_ota_init_config(void)
     
     // 串口属性配置
     uart_attr_t attr = {
-        .baud_rate = 921600, \\115200传输有问题
+        .baud_rate = 115200, //115200传输有问题
         .data_bits = UART_DATA_BIT_8, 
         .stop_bits = UART_STOP_BIT_1, 
         .parity = UART_PARITY_NONE
@@ -245,16 +245,16 @@ static void uart_ota_task(void *argument)
                     osal_printk("[UART OTA]: write_size <= 0, skipping\r\n");
                 }
             }
+            
         }
-        
+        // 喂狗
+        upg_watchdog_kick();
     }
 }
 
 // 创建UART OTA任务
 static void uart_ota_sample(void)
 {
-    // 禁用看门狗，防止开发阶段重启
-    uapi_watchdog_disable();
     osThreadAttr_t attr;
     attr.name = "uart_ota_task";
     attr.attr_bits = 0U;
