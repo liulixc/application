@@ -1,5 +1,6 @@
 set(SOURCES_LIST
-    ${CMAKE_CURRENT_SOURCE_DIR}/uart_ota_task.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/l610.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/l610_ota_task.c
 )
 
 set(PUBLIC_HEADER_LIST

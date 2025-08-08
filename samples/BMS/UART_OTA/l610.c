@@ -31,6 +31,8 @@ uart_recv uart2_recv = {0};
 static void* l610_mutex = NULL; // osal_mutex_t未定义时用void*
 static uint8_t l610_ready_flag = 0; // L610模块就绪标志位: 0-未就绪, 1-已就绪
 
+
+
 uint8_t isPrintf=1;	//定义于main函数: 是否打印日志
 
 #define CMD_LEN 1024
@@ -80,7 +82,7 @@ void app_uart_init_config(void)
     uapi_pin_set_mode(CONFIG_UART_RXD_PIN, CONFIG_UART_PIN_MODE);
     uart_attr_t attr = {
         .baud_rate = 115200, .data_bits = UART_DATA_BIT_8, .stop_bits = UART_STOP_BIT_1, .parity = UART_PARITY_NONE};
-    uart_buffer_config.rx_buffer_size = 512;
+    uart_buffer_config.rx_buffer_size = 1024;
     uart_buffer_config.rx_buffer = uart_rx_buffer;
     uart_pin_config_t pin_config = {.tx_pin = S_MGPIO0, .rx_pin = S_MGPIO1, .cts_pin = PIN_NONE, .rts_pin = PIN_NONE};
     uapi_uart_deinit(UART_ID);
@@ -156,6 +158,11 @@ void L610_Attach(uint8_t isPrintf,uint8_t isReboot) {
             osal_msleep(3000);
             first=0;
         }
+        
+        // 关闭回显
+        L610_SendCmd("ATE0\r\n", "OK", 1000, isPrintf);
+        if (isPrintf) printf("[L610] Echo disabled\r\n");
+        
 		L610_SendCmd((uint8_t *) "AT+MIPCALL=1\r\n", (uint8_t *) "OK", 1000,isPrintf);
 		printf("Attach!\r\n");
 	}
@@ -170,7 +177,7 @@ void L610_Detach(uint8_t isPrintf) {
 
     L610_SendCmd("AT+HMDIS\r\n", "OK", DefaultTimeout, isPrintf);
 
-    L610_SendCmd((uint8_t *) "AT+MIPCALL=0\r\n", (uint8_t *) "OK", 1000,isPrintf);
+    L610_SendCmd((uint8_t *) "AT+MIPCALL=0\r\n", (uint8_t *) "OK", DefaultTimeout,isPrintf);
     if (isPrintf) printf("Detach!\r\n");
 }
 
@@ -179,6 +186,11 @@ void L610_Detach(uint8_t isPrintf) {
 
 // 华为云平台MQTT连接
 void L610_HuaweiCloudConnect(char *ip, char *port, char *clientid, char *password, int keepalive, int cleanSession) {
+    if (!ip || !port || !clientid || !password) {
+        printf("[L610] HuaweiCloudConnect: Invalid parameters\r\n");
+        return;
+    }
+    
     memset(cmdSend, 0, sizeof(cmdSend));
     snprintf(cmdSend, sizeof(cmdSend),
         "AT+HMCON=0,%d,\"%s\",\"%s\",\"%s\",\"%s\",%d\r\n",
@@ -211,64 +223,103 @@ void L610_HuaweiCloudSubscribe(int qos, char *topic, uint8_t isPrintf) {
     L610_SendCmd(cmdSend, "OK", DefaultTimeout, isPrintf);
 }
 
-/********************4G OTA升级****************************/
-
-// 4G OTA配置结构体
-typedef struct {
-    char server_ip[64];
-    int server_port;
-    char firmware_path[128];
-    char device_id[32];
-    uint32_t file_size;
-    uint8_t ota_in_progress;
-} l610_ota_config_t;
-
-// 全局4G OTA配置
-static l610_ota_config_t g_l610_ota_config = {
-    .server_ip = "1.13.92.135",
-    .server_port = 7998,
-    .firmware_path = "/api/firmware/download/update.fwpkg",
-    .device_id = "gateway",
-    .file_size = 0,
-    .ota_in_progress = 0
-};
-
-/*
-函数名称: L610_OTA_SetConfig
-说明: 设置4G OTA配置参数
-参数: 
-    char *ip: 服务器IP地址
-    int port: 服务器端口
-    char *path: 固件下载路径
-    char *device_id: 设备ID
-返回值: 0-成功, -1-失败
-*/
-int L610_OTA_SetConfig(const char *ip, int port, const char *path, const char *device_id) {
-    if (!ip || !path || !device_id || port <= 0 || port > 65535) {
-        printf("[L610 OTA] Invalid config parameters\r\n");
-        return -1;
+/**
+ * @brief 从MQTT命令主题中提取request_id
+ * @param topic MQTT主题字符串，格式如："$oc/devices/680b91649314d11851158e8d_Battery01/sys/commands/request_id=a8c3df05-2003-4445-8d2b-3130fec1772e"
+ * @return 提取的request_id字符串，需要调用者释放内存；失败返回NULL
+ */
+char* l610_ota_extract_request_id(const char* topic)
+{
+    if (!topic) return NULL;
+    
+    // 查找"request_id="字符串
+    const char* request_id_start = strstr(topic, "request_id=");
+    if (!request_id_start) {
+        osal_printk("[L610 OTA]: request_id not found in topic: %s\r\n", topic);
+        return NULL;
     }
     
-    // 检查字符串长度
-    if (strlen(ip) >= sizeof(g_l610_ota_config.server_ip) || 
-        strlen(path) >= sizeof(g_l610_ota_config.firmware_path) ||
-        strlen(device_id) >= sizeof(g_l610_ota_config.device_id)) {
-        printf("[L610 OTA] Config string too long\r\n");
-        return -1;
+    // 跳过"request_id="
+    request_id_start += 11;
+    
+    // 查找request_id的结束位置（遇到逗号、引号或字符串结束）
+    const char* request_id_end = request_id_start;
+    while (*request_id_end && *request_id_end != ',' && *request_id_end != '"' && *request_id_end != '\r' && *request_id_end != '\n') {
+        request_id_end++;
     }
     
-    // 更新配置
-    strcpy(g_l610_ota_config.server_ip, ip);
-    g_l610_ota_config.server_port = port;
-    strcpy(g_l610_ota_config.firmware_path, path);
-    strcpy(g_l610_ota_config.device_id, device_id);
+    // 计算request_id长度
+    int request_id_len = request_id_end - request_id_start;
+    if (request_id_len <= 0 || request_id_len > 64) {
+        osal_printk("[L610 OTA]: Invalid request_id length: %d\r\n", request_id_len);
+        return NULL;
+    }
     
-    printf("[L610 OTA] Config updated - IP:%s, Port:%d, Path:%s, DeviceID:%s\r\n", 
-           ip, port, path, device_id);
-    return 0;
+    // 分配内存并复制request_id
+    char* request_id = (char*)malloc(request_id_len + 1);
+    if (!request_id) {
+        osal_printk("[L610 OTA]: Failed to allocate memory for request_id\r\n");
+        return NULL;
+    }
+    
+    memcpy(request_id, request_id_start, request_id_len);
+    request_id[request_id_len] = '\0';
+    
+    osal_printk("[L610 OTA]: Extracted request_id: %s\r\n", request_id);
+    return request_id;
+}
+
+/**
+ * @brief 处理升级命令
+ * @param payload MQTT消息载荷
+ * @return 0-成功, -1-失败
+ */
+int l610_ota_process_upgrade_command(const char* payload)
+{
+    if (!payload) return -1;
+    
+    osal_printk("[L610 OTA]: Processing upgrade command: %s\r\n", payload);
+    
+    // 简单的命令解析，实际应用中可能需要JSON解析
+    if (strstr(payload, "upgrade") || strstr(payload, "ota")) {
+        osal_printk("[L610 OTA]: Upgrade command detected, starting OTA process\r\n");
+        return 0;
+    }
+    
+    return -1;
 }
 
 
+
+/**
+ * @brief 处理升级命令
+ * @param command_data 命令数据
+ */
+void l610_ota_handle_upgrade_command(char *command_data)
+{
+    if (!command_data) return;
+    
+    osal_printk("[L610 OTA]: Handling upgrade command: %s\r\n", command_data);
+    
+    if (l610_ota_process_upgrade_command(command_data) == 0) {
+        // 从命令数据中提取request_id
+        char* request_id = l610_ota_extract_request_id(command_data);
+        if (request_id) {
+            // 回复确认消息，使用提取的request_id
+            char reply_topic[128];
+            snprintf(reply_topic, sizeof(reply_topic), 
+                     MQTT_CLIENT_RESPONSE, 
+                     request_id);
+            L610_HuaweiCloudReport(reply_topic, "{\"result_code\":0,\"response_name\":\"OTA_START\"}");
+            
+            // 释放request_id内存
+            free(request_id);
+        }
+    }
+}
+
+
+/********************4G OTA升级****************************/
 
 /********************HTTP协议****************************/
 
@@ -321,6 +372,30 @@ void L610_HttpSetUserAgent(char *user_agent, uint8_t isPrintf) {
 }
 
 /*
+函数名称: L610_HttpSetRange
+说明: 设置HTTP Range参数
+参数: 
+    char *range: HTTP Range字符串
+    uint8_t isPrintf: 是否打印日志
+返回值: 无
+*/
+void L610_HttpSetRange(char *range, uint8_t isPrintf) {
+    if (range == NULL) {
+        if (isPrintf) printf("[L610] HTTP Range is NULL!\r\n");
+        return;
+    }
+    
+    memset(cmdSend, 0, sizeof(cmdSend));
+    snprintf(cmdSend, sizeof(cmdSend), "AT+HTTPSET=\"RANGE\",\"%s\"\r\n", range);
+    
+    if (isPrintf) {
+        printf("[L610] Setting HTTP Range: %s\r\n", range);
+    }
+    
+    L610_SendCmd(cmdSend, "OK", DefaultTimeout, isPrintf);
+}
+
+/*
 函数名称: L610_HttpAction
 说明: 开始HTTP业务操作
 参数: 
@@ -342,7 +417,8 @@ void L610_HttpAction(int method, uint8_t isPrintf) {
     }
     
     // HTTP操作可能需要更长的超时时间
-    L610_SendCmd(cmdSend, "OK", 5000, isPrintf);
+    L610_SendCmd(cmdSend, "+HTTPRES:", 5000, isPrintf);
+
 }
 
 /*
@@ -372,7 +448,10 @@ void L610_HttpRead(int offset, int length, uint8_t isPrintf) {
     }
     
     // HTTP读取可能需要较长的超时时间
-    L610_SendCmd(cmdSend, "+HTTPREAD:", 5000, isPrintf);
+    uart2_recv.recv_flag = 0;
+    uart2_recv.recv_len = 0;
+    memset(uart2_recv.recv, 0, sizeof(uart2_recv.recv));
+    uart_send_buff((uint8_t *)cmdSend, strlen(cmdSend));
 }
 
 /*
@@ -396,24 +475,65 @@ void L610_HttpGet(char *url, char *user_agent, uint8_t isPrintf) {
     
     // 1. 设置URL
     L610_HttpSetUrl(url, isPrintf);
-    osal_msleep(500);
     
     // 2. 设置User-Agent (如果提供)
     if (user_agent != NULL) {
         L610_HttpSetUserAgent(user_agent, isPrintf);
-        osal_msleep(500);
     }
     
     // 3. 执行GET请求
     L610_HttpAction(0, isPrintf);
     
     if (isPrintf) {
-        printf("[L610] HTTP GET request initiated. Wait for +HTTP: 1 and +HTTPRES response\r\n");
+        printf("[L610] HTTP GET request initiated.\r\n");
+    }
+}
+
+/*
+函数名称: L610_HttpGetWithRange
+说明: 执行带Range的HTTP GET请求
+参数: 
+    char *url: 请求的URL地址
+    char *range: HTTP Range字符串
+    uint8_t isPrintf: 是否打印日志
+返回值: 无
+*/
+void L610_HttpGetWithRange(char *url, char *range, uint8_t isPrintf) {
+    if (url == NULL) {
+        if (isPrintf) printf("[L610] HTTP GET with Range: URL is NULL!\r\n");
+        return;
+    }
+    
+    if (isPrintf) {
+        printf("[L610] Starting HTTP GET with Range request to: %s, Range: %s\r\n", url, range ? range : "NULL");
+    }
+    
+    // 1. 设置URL
+    L610_HttpSetUrl(url, isPrintf);
+    
+    // 2. 设置Range (如果提供)
+    if (range != NULL && strlen(range) > 0) {
+        L610_HttpSetRange(range, isPrintf);
+    }
+    
+    // 3. 设置默认User-Agent
+    L610_HttpSetUserAgent("fibocom", isPrintf);
+    
+    // 4. 执行GET请求
+    L610_HttpAction(0, isPrintf);
+    
+    if (isPrintf) {
+        printf("[L610] HTTP GET with Range request initiated\r\n");
     }
 }
 
 // 华为云平台上报数据
 void L610_HuaweiCloudReport(char *topic, char *payload) {
+    if (topic == NULL || payload == NULL) {
+        printf("[L610] Report: topic or payload is NULL!\r\n");
+        return;
+    }
+    
     memset(cmdSend, 0, sizeof(cmdSend));
     int payload_len = strlen(payload); // 只算原始JSON长度
     // 构造转义后的payload

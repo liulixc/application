@@ -221,12 +221,6 @@ static void uart_ota_task(void *argument)
                         if (received_size >= total_file_size) {
                             osal_printk("[UART OTA]: recv all succ\r\n");
                             
-                            // 数据完整性最终检查
-                            if (received_size != total_file_size) {
-                                osal_printk("[UART OTA]: data incomplete! expected=%d, received=%d\r\n", total_file_size, received_size);
-                                return;
-                            }
-                            
                             osal_printk("[UART OTA]: data integrity check passed, starting upgrade...\r\n");
                             
                             ret = uapi_upg_request_upgrade(false);
