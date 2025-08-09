@@ -22,7 +22,7 @@
 
 // 全局OTA上下文
 static l610_ota_context_t g_l610_ota_ctx = {
-    .firmware_url = "http://1.13.92.135:7998/api/firmware/download/slave.fwpkg",
+    .firmware_url = "http://1.13.92.135:7998/api/firmware/download/update.fwpkg",
     .huawei_cloud_ip = "117.78.5.125",
     .huawei_cloud_port = "1883",
     .client_id = "680b91649314d11851158e8d_Battery01",
@@ -131,6 +131,8 @@ void l610_ota_task_thread(void *argument)
     // 初始化
     l610_ota_init();
 
+
+
     osal_printk("[L610 OTA]: Waiting for upgrade command...\r\n");
     while (1) {
         if (uart2_recv.recv_flag) {
@@ -155,7 +157,8 @@ void l610_ota_task_thread(void *argument)
     header_parsed = false;
 
     uint8_t head_recv = 0;
-    total_file_size=980624;
+    total_file_size=1072096;
+    l610_ota_prepare(total_file_size);
     // 分块下载剩余数据
      while (received_size < total_file_size) {
          uint32_t chunk_start = received_size;
