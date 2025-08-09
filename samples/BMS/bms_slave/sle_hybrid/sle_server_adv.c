@@ -29,7 +29,7 @@
 /* 超时时间4990ms，单位10ms */
 #define SLE_CONN_MAX_LATENCY                      0x1F3
 /* 广播发送功率 */
-#define SLE_ADV_TX_POWER  10
+#define SLE_ADV_TX_POWER  20
 /* 最大广播数据长度 */
 #define SLE_ADV_DATA_LEN_MAX                      251
 /* 广播名称 */

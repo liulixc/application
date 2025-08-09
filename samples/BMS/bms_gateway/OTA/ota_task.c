@@ -30,15 +30,11 @@
 #define PASSWORD "tangyuan"
 
 // 默认OTA配置
-#define DEFAULT_SERVER_IP     "1.13.92.135"
-#define DEFAULT_SERVER_PORT   7998
 #define DEFAULT_FIRMWARE_PATH "/api/firmware/download/test.fwpkg"
-#define DEFAULT_DEVICE_ID     "gateway_main"  // 默认设备ID
+#define DEFAULT_DEVICE_ID     "1"  // 默认设备ID（网关设备ID为1）
 
 // 全局OTA配置
 static ota_config_t g_ota_config = {
-    .server_ip = DEFAULT_SERVER_IP,
-    .server_port = DEFAULT_SERVER_PORT,
     .firmware_path = DEFAULT_FIRMWARE_PATH,
     .device_id = DEFAULT_DEVICE_ID
 };
@@ -52,29 +48,26 @@ static char g_request_buffer[MAX_REQUEST_SIZE] = {0};
 /**
  * @brief 设置OTA服务器配置
  */
-int ota_set_config(const char *ip, int port, const char *path, const char *device_id)
+int ota_set_config(const char *path, const char *device_id)
 {
-    if (!ip || !path || !device_id || port <= 0 || port > 65535) {
+    if (!path || !device_id) {
         osal_printk("[ota task]: invalid config parameters\r\n");
         return -1;
     }
     
     // 检查字符串长度
-    if (strlen(ip) >= sizeof(g_ota_config.server_ip) || 
-        strlen(path) >= sizeof(g_ota_config.firmware_path) ||
+    if (strlen(path) >= sizeof(g_ota_config.firmware_path) ||
         strlen(device_id) >= sizeof(g_ota_config.device_id)) {
         osal_printk("[ota task]: config string too long\r\n");
         return -1;
     }
     
     // 更新配置
-    strcpy(g_ota_config.server_ip, ip);
-    g_ota_config.server_port = port;
     strcpy(g_ota_config.firmware_path, path);
     strcpy(g_ota_config.device_id, device_id);
     
-    osal_printk("[ota task]: config updated - IP:%s, Port:%d, Path:%s, DeviceID:%s\r\n", 
-                ip, port, path, device_id);
+    osal_printk("[ota task]: config updated - Path:%s, DeviceID:%s\r\n", 
+                path, device_id);
     return 0;
 }
 
@@ -93,14 +86,20 @@ int ota_check_device_id(const char *device_id)
         return 1;
     }
     
-    // 检查是否为网关设备
-    if (strcmp(device_id, "gateway") == 0 || strcmp(device_id, "gateway_main") == 0) {
-        osal_printk("[ota task]: upgrade target is gateway device\r\n");
+    // 检查是否为网关设备（设备ID为1）
+    if (strcmp(device_id, "1") == 0) {
+        osal_printk("[ota task]: upgrade target is gateway device (ID: 1)\r\n");
         return 1;
     }
     
-    // 可以根据实际需求添加更多设备ID匹配逻辑
-    osal_printk("[ota task]: device ID '%s' does not match current device\r\n", device_id);
+    // 检查是否为有效的设备ID（1-12）
+    int id = atoi(device_id);
+    if (id >= 1 && id <= 12) {
+        osal_printk("[ota task]: device ID %d is valid but not current device\r\n", id);
+        return 0;  // 有效ID但不是当前设备
+    }
+    
+    osal_printk("[ota task]: invalid device ID '%s'\r\n", device_id);
     return 0;
 }
 
@@ -110,14 +109,18 @@ int ota_check_device_id(const char *device_id)
  */
 static int build_http_request(void)
 {
+    // 使用默认的服务器配置
+    const char *default_ip = "1.13.92.135";
+    int default_port = 7998;
+    
     int ret = snprintf(g_request_buffer, MAX_REQUEST_SIZE,
         "GET %s HTTP/1.1\r\n"
         "Host: %s:%d\r\n"
         "Connection: close\r\n"
         "\r\n",
         g_ota_config.firmware_path,
-        g_ota_config.server_ip,
-        g_ota_config.server_port);
+        default_ip,
+        default_port);
     
     if (ret >= MAX_REQUEST_SIZE) {
         osal_printk("[ota task]: HTTP request too long\r\n");
@@ -183,6 +186,10 @@ int http_clienti_get(const char *argument) {
         return -1;
     }
 
+    // 使用默认的服务器配置
+    const char *default_ip = "1.13.92.135";
+    int default_port = 7998;
+    
     wifi_connect(SSID,PASSWORD);
     struct sockaddr_in addr = {0};
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -193,15 +200,15 @@ int http_clienti_get(const char *argument) {
     }
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(g_ota_config.server_port);
-    addr.sin_addr.s_addr = inet_addr(g_ota_config.server_ip);
+    addr.sin_port = htons(default_port);
+    addr.sin_addr.s_addr = inet_addr(default_ip);
     if (connect(sockfd, (struct sockaddr *)&addr, sizeof(addr)) != 0) 
     {
-        osal_printk("sock connect fail to %s:%d\r\n", g_ota_config.server_ip, g_ota_config.server_port);
+        osal_printk("sock connect fail to %s:%d\r\n", default_ip, default_port);
         lwip_close(sockfd);
         return -1;
     }
-    osal_printk("sock connect succ to %s:%d\r\n", g_ota_config.server_ip, g_ota_config.server_port);
+    osal_printk("sock connect succ to %s:%d\r\n", default_ip, default_port);
 
     if (send(sockfd, g_request_buffer, strlen(g_request_buffer), 0) < 0) 
     {
@@ -406,7 +413,7 @@ int ota_task_start(void)
     return 0;
 }
 
-int ota_task_start_with_config(const char *ip, int port, const char *path, const char *device_id)
+int ota_task_start_with_config(const char *path, const char *device_id)
 {
     // 检查设备ID是否匹配
     if (!ota_check_device_id(device_id)) {
@@ -415,7 +422,7 @@ int ota_task_start_with_config(const char *ip, int port, const char *path, const
     }
     
     // 设置OTA配置
-    if (ota_set_config(ip, port, path, device_id) != 0) {
+    if (ota_set_config(path, device_id) != 0) {
         printf("Set OTA config fail.\r\n");
         return -1;
     }

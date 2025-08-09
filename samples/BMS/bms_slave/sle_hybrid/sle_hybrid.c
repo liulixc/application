@@ -129,6 +129,8 @@ void hybrid_node_revert_to_orphan(void)
  * @param arg 传入参数，未使用
  * @note 依次初始化服务端、客户端，注册回调，启动发送测试
  */
+
+ int mutex=1;
 void sle_hybrid_task(char *arg)
 {
     osal_msleep(2500); // 等待2.5秒钟
@@ -144,7 +146,7 @@ void sle_hybrid_task(char *arg)
     local_address.addr[2]=0x33;
     local_address.addr[3]=0x44;
     local_address.addr[4]=0x55;
-    local_address.addr[5]=0x05;
+    local_address.addr[5]=0x03;
     (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
     g_local_addr.type = local_address.type;
     sle_set_local_addr(&g_local_addr);

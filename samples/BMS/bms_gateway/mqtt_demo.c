@@ -325,11 +325,14 @@ void switch_to_4g(void)
         60,              // keepalive
         0                // cleanSession
     );
+    L610_HuaweiCloudSubscribe(0, "$oc/devices/680b91649314d11851158e8d_Battery01/sys/commands/#", 1);    
+    
     current_net = NET_TYPE_4G;
     printf("[网络切换] 已切换到4G\n");
 }
 
 // ======================== 任务实现 ========================
+bool OTAing =false;
 
 int mqtt_task(void)
 {
@@ -398,24 +401,20 @@ int mqtt_task(void)
                 if (json != NULL) {
                     cJSON *paras = cJSON_GetObjectItem(json, "paras");
                         if (paras != NULL) {
-                            cJSON *server_ip = cJSON_GetObjectItem(paras, "server_ip");
-                            cJSON *server_port = cJSON_GetObjectItem(paras, "server_port");
                             cJSON *firmware_path = cJSON_GetObjectItem(paras, "firmware_path");
                             cJSON *device_id = cJSON_GetObjectItem(paras, "device_id");
                             
                             // 提取参数，使用提供的值或默认值
-                            const char *ip = (server_ip && cJSON_IsString(server_ip)) ? server_ip->valuestring : "1.13.92.135";
-                            int port = (server_port && cJSON_IsNumber(server_port)) ? (int)server_port->valuedouble : 7998;
                             const char *path = (firmware_path && cJSON_IsString(firmware_path)) ? firmware_path->valuestring : "/api/firmware/download/test.bin";
-                            const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "gateway_main";
+                            const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "1";
                             
-                            printf("[OTA] 使用配置: IP=%s, Port=%d, Path=%s, DeviceID=%s\n", ip, port, path, dev_id);
+                            printf("[OTA] 使用配置: Path=%s, DeviceID=%s\n", path, dev_id);
                             
-                            // 判断是否为网关自身的升级
-                            if (strcmp(dev_id, "gateway_main") == 0) {
+                            // 判断是否为网关自身的升级（设备ID为1）
+                            if (strcmp(dev_id, "1") == 0) {
                                 // 网关自身升级
                                 printf("[OTA] 网关自身升级\n");
-                                int ota_result = ota_task_start_with_config(ip, port, path, dev_id);
+                                int ota_result = ota_task_start_with_config(path, dev_id);
                                 
                                 // 发送响应
                                 sprintf(g_send_buffer, MQTT_CLIENT_RESPONSE, current_cmd.response_id);
@@ -474,7 +473,7 @@ int mqtt_task(void)
         
         // 智能网络管理逻辑
         if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
-            if (current_net == NET_TYPE_4G) {
+            if (current_net == NET_TYPE_4G && !OTAing) {
                 // 当前是4G模式，检查WiFi是否可用
                 if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
                     printf("[网络管理] 成功连接并切换到WiFi模式\\n");
@@ -504,7 +503,7 @@ int mqtt_task(void)
             } else {
                 // printf("[MQTT] 跳过数据上报:无活跃BMS设备连接\r\n");
             }        
-        } else if (current_net == NET_TYPE_4G) {
+        } else if (current_net == NET_TYPE_4G && !OTAing) {
             // 调用封装的4G数据上报函数
             L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
         }

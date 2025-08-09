@@ -8,6 +8,7 @@ set(SOURCES_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/sle_client/sle_client.c
     ${CMAKE_CURRENT_SOURCE_DIR}/monitor/monitor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/OTA/ota_task.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/l610/l610_ota_task.c
 )
 
 # 设置头文件目录列表

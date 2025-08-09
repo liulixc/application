@@ -15,13 +15,15 @@
 #include "securec.h"
 #include "l610.h"
 #include "stdio.h"
+#include "mqtt_demo.h"
+#include "sle_client.h"
 
 #define L610_OTA_TASK_STACK_SIZE 0x3000
 #define L610_OTA_CHUNK_SIZE      360000  // 36万字节
 
 
 // 全局OTA上下文
-static l610_ota_context_t g_l610_ota_ctx = {
+l610_ota_context_t g_l610_ota_ctx = {
     .firmware_url = "http://1.13.92.135:7998/api/firmware/download/update.fwpkg",
     .huawei_cloud_ip = "117.78.5.125",
     .huawei_cloud_port = "1883",
@@ -33,6 +35,7 @@ static l610_ota_context_t g_l610_ota_ctx = {
 // 全局变量
 static uint32_t total_file_size = 0;
 static uint32_t received_size = 0;
+uint32_t parsed_file_size = 1072096; // 从JSON命令解析的文件大小，默认值
 // 外部UART接收结构体引用
 extern uart_recv uart2_recv;
 
@@ -79,48 +82,10 @@ errcode_t l610_ota_prepare(uint32_t file_size)
 }
 
 
-// Static variables for robust HTTP header and data parsing
-static char http_buffer[2048];
-static int http_buffer_len = 0;
 static bool header_parsed = false;
-static int actual_header_length = 0;  // 实际HTTP响应头长度
 
-/**
- * @brief L610 OTA初始化函数
- */
-void l610_ota_init(void)
-{
-    osal_printk("[L610 OTA]: Initializing L610 OTA module\r\n");
-    
-    received_size = 0;
-    total_file_size = 0;
-
-    // Reset parsing state for new OTA attempt
-    http_buffer_len = 0;
-    header_parsed = false;
-
-    app_uart_init_config();
-
-    if (!L610_WaitForInit(10000)) {
-        osal_printk("[L610 OTA]: L610 init failed. Halting.\r\n");
-        return;
-    }
-
-    L610_Attach(1, 1);
-    L610_HuaweiCloudConnect(
-        g_l610_ota_ctx.huawei_cloud_ip,
-        g_l610_ota_ctx.huawei_cloud_port,
-        g_l610_ota_ctx.client_id,
-        g_l610_ota_ctx.password,
-        60,
-        0
-    );
-
-    L610_HuaweiCloudSubscribe(0, g_l610_ota_ctx.command_topic, 1);    
-    osal_msleep(1000);
-}
-
-
+extern net_type_t current_net;
+extern bool OTAing;
 /**
  * @brief L610 OTA任务线程函数
  * @param argument 任务参数
@@ -128,18 +93,41 @@ void l610_ota_init(void)
 void l610_ota_task_thread(void *argument)
 {
     unused(argument);
-    // 初始化
-    l610_ota_init();
 
-    osal_printk("[L610 OTA]: Waiting for upgrade command...\r\n");
+    // 初始化OTA相关变量
+    received_size = 0;
+    total_file_size = 0;
+    header_parsed = false;
+
+    osal_printk("[L610 CMD]: L610 command processing task started...\r\n");
+    
     while (1) {
-        if (uart2_recv.recv_flag) {
+        // 检查是否有新的UART消息
+        if (uart2_recv.recv_flag && current_net == NET_TYPE_4G) {
             char* message = (char*)uart2_recv.recv;
-            if (strstr(message, "upgrade") || strstr(message, "OTA")) {
+            if (strstr(message, "upgrade") || strstr(message, "ota")) {
                 osal_printk("[L610 OTA]: Upgrade command received\r\n");
+                OTAing = true;
                 l610_ota_handle_upgrade_command(message);
                 uart2_recv.recv_flag = 0;
                 break; 
+            }
+            if(strstr(message, "switch"))
+            {
+                osal_printk("[L610 OTA]: switch command forward to children\r\n");
+                char* request_id = l610_ota_extract_request_id(message);
+                if (request_id) {
+                    // 回复确认消息，使用提取的request_id
+                    char reply_topic[128];
+                    snprintf(reply_topic, sizeof(reply_topic), 
+                                MQTT_CLIENT_RESPONSE, 
+                                request_id);
+                    L610_HuaweiCloudReport(reply_topic, "{\"result_code\":0,\"response_name\":\"OTA_START\"}");
+                    
+                    // 释放request_id内存
+                    free(request_id);
+                }
+                sle_gateway_send_command_to_children(message, strlen(message));
             }
             uart2_recv.recv_flag = 0;
         }
@@ -151,11 +139,11 @@ void l610_ota_task_thread(void *argument)
 
     memset(uart2_recv.recv, 0, sizeof(uart2_recv.recv));
     uart2_recv.recv_flag = 0;
-    http_buffer_len = 0;
+
     header_parsed = false;
 
-    uint8_t head_recv = 0;
-    total_file_size=1072096;
+    total_file_size = parsed_file_size;
+    osal_printk("[L610 OTA]: Using parsed file size: %u bytes\r\n", total_file_size);
     l610_ota_prepare(total_file_size);
     // 分块下载剩余数据
      while (received_size < total_file_size) {

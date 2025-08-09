@@ -56,7 +56,7 @@
 #define I2C_SET_BANDRATE 400000
 #define I2C_MASTER_ADDR 0x0
 
-#define SPI_TASK_STACK_SIZE 0x1000
+#define SPI_TASK_STACK_SIZE 0x2000
 #define SPI_TASK_DURATION_MS 300
 #define SPI_TASK_PRIO 17
 
@@ -958,12 +958,12 @@ void  Balance_task(uint16_t mv)    //计算哪个电池需要均衡
 		
 		Write_Balance_Commond(V_mask);	  //均衡控制     1为开启，0为关闭  总共12位，
         //printf("Balance Cell:%d \r\n",V_mask);
-        printf("Balance Enable\r\n");
+        // printf("Balance Enable\r\n");
 	}
 	else 
 	{
 		Write_Balance_Commond(0x0000);	  //均衡控制     1为开启，0为关闭  总共12位，
-        printf("Balance Disable\r\n");
+        // printf("Balance Disable\r\n");
 	}
 }
 
@@ -1098,7 +1098,7 @@ uint16_t LTC6804_Calculate_Temperature(float adc_value) {
 /******************************************************************   END   *****************************************************************/
 
 extern network_adv_data_t g_network_status;
-
+bms_thread_running = true;
 void *bms_salve_task(void)
 {
     uapi_watchdog_disable();
@@ -1125,7 +1125,7 @@ void *bms_salve_task(void)
     int Current = 0;
     
 
-    while (1) {
+    while (bms_thread_running) {
         MOD_VOL = 0;
         for(int i=0;i<12;i++)
         {
@@ -1146,9 +1146,9 @@ void *bms_salve_task(void)
         LTC6804_rdaux(0, Total_IC, gpiocode);//00 0c    00 0e
         osal_mdelay(10);
         adc_port_read(adc_channel, &voltage);
-         printf("ADC Voltage:%d \r\n",voltage);
+        //  printf("ADC Voltage:%d \r\n",voltage);
         Current = (voltage-2500)*50;
-        osal_printk("Current: %d\r\n", Current);
+        // osal_printk("Current: %d\r\n", Current);
 
         for(int i = 0; i < 12; i++)//过压欠压告警
         {
@@ -1180,11 +1180,11 @@ void *bms_salve_task(void)
 
         if(Current < 0.2)
         {
-            printf("Charging Current:%d mA\r\n", Current);
+            // printf("Charging Current:%d mA\r\n", Current);
         }
         else if(Current > 0.2 && Current < 30)
         {
-            printf("Discharging Current:%d mA\r\n", Current);
+            // printf("Discharging Current:%d mA\r\n", Current);
         }
         else if(Current > 15000)
         {
@@ -1227,32 +1227,42 @@ void *bms_salve_task(void)
         char *json_str = cJSON_Print(root);
         // printf("BMS_JSON:%s\n", json_str);
         
-        if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()) {
+        if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()&&bms_thread_running&&mutex) {
+            mutex=0;
             osal_printk("Member node sending its own JSON data...\r\n");
             // 直接发送JSON字符串，长度+1以包含末尾的'\0'
             sle_hybrids_send_data((uint8_t*)json_str, strlen(json_str) + 1);
+            mutex=1;
+
         }
 
         // 释放内存
         cJSON_Delete(root);
         free(json_str);
         
-        osal_mdelay(200); // 适当延长发送间隔
+        if(!bms_thread_running)break;
+        osal_mdelay(500); // 适当延长发送间隔
     }
     return 0;
 }
 
-// static void bms_slave_entry(void)
-// {
-//     osal_task *task_handle = NULL;
-//     osal_kthread_lock();
-//     task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
-//     if (task_handle != NULL) {
-//         osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
-//         osal_kfree(task_handle);
-//     }
-//     osal_kthread_unlock();
-// }
+static void bms_slave_entry(void)
+{
+    osal_task *task_handle = NULL;
+    osal_kthread_lock();
+    task_handle = osal_kthread_create((osal_kthread_handler)bms_salve_task, 0, "bms_salve_task", SPI_TASK_STACK_SIZE);
+    if (task_handle != NULL) {
+        osal_kthread_set_priority(task_handle, SPI_TASK_PRIO);
+        osal_kfree(task_handle);
+    }
+    osal_kthread_unlock();
+}
 
 // /* Run the bms_salve_entry. */
-// app_run(bms_slave_entry);
+app_run(bms_slave_entry);
+
+// 添加停止函数
+void bms_thread_stop(void)
+{
+    bms_thread_running = false;
+}

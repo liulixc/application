@@ -7,8 +7,6 @@
  * @brief OTA配置结构体
  */
 typedef struct {
-    char server_ip[64];      // 服务器IP地址
-    int server_port;         // 服务器端口
     char firmware_path[256]; // 固件文件路径
     char device_id[32];      // 目标设备ID
 } ota_config_t;
@@ -21,7 +19,7 @@ typedef struct {
  * @param device_id 目标设备ID
  * @return int 返回值，0表示成功
  */
-int ota_set_config(const char *ip, int port, const char *path, const char *device_id);
+int ota_set_config(const char *path, const char *device_id);
 
 /**
  * @brief OTA准备函数
@@ -44,14 +42,12 @@ int http_clienti_get(const char *argument);
 int ota_task_start(void);
 
 /**
- * @brief 启动带配置的OTA任务
- * @param ip 服务器IP地址
- * @param port 服务器端口
+ * @brief 使用指定配置启动OTA任务
  * @param path 固件文件路径
  * @param device_id 目标设备ID
  * @return int 返回值，0表示成功
  */
-int ota_task_start_with_config(const char *ip, int port, const char *path, const char *device_id);
+int ota_task_start_with_config(const char *path, const char *device_id);
 
 /**
  * @brief 检查设备ID是否匹配当前设备

@@ -18,5 +18,7 @@
 
 
 void *bms_salve_task(void);
+void bms_thread_stop(void);
+
 
 #endif

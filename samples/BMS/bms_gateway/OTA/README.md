@@ -60,7 +60,7 @@ OTA/
 {
   "command_name": "ota_upgrade",
   "paras": {
-    "device_id": "gateway"
+    "device_id": "1"
   }
 }
 ```
@@ -71,22 +71,19 @@ OTA/
 {
   "command_name": "ota_upgrade",
   "paras": {
-    "server_ip": "1.13.92.135",
-    "server_port": 7999,
     "firmware_path": "/api/firmware/download/test.bin",
-    "device_id": "gateway"
+    "device_id": "2"
   }
 }
 ```
 
 **参数说明：**
-- `server_ip`: 固件服务器IP地址（字符串）
-- `server_port`: 固件服务器端口（数字）
 - `firmware_path`: 固件文件路径（字符串）
 - `device_id`: 目标设备ID（字符串）
 
 **支持的设备ID：**
-- `"gateway"` 或 `"gateway_main"`: 网关设备
+- `"1"`: 网关设备
+- `"2"` 到 `"12"`: 子设备（BMS设备）
 - `"all"` 或 `"*"`: 广播升级（所有设备）
 - 其他自定义设备ID
 
@@ -132,8 +129,6 @@ OTA/
 ```c
 #define SSID  "QQ"                    // WiFi SSID
 #define PASSWORD "tangyuan"           // WiFi密码
-#define SERVER_IP "1.13.92.135"       // 升级服务器IP
-#define SOCK_TARGET_PORT 8080         // 服务器端口
 ```
 
 升级文件请求路径：
@@ -161,23 +156,21 @@ static const char *g_request =
 {
   "command_name": "ota_upgrade",
   "paras": {
-    "device_id": "gateway"
+    "device_id": "1"
   }
 }
 ```
 
-### 3. 使用完整动态配置
+### 3. 使用动态配置
 
-发送包含完整OTA配置参数的MQTT命令，可以实时指定服务器地址、固件路径和目标设备：
+发送包含固件路径和目标设备的MQTT命令：
 
 ```json
 {
   "command_name": "ota_upgrade",
   "paras": {
-    "server_ip": "192.168.1.100",
-    "server_port": 8080,
     "firmware_path": "/firmware/v2.0/device.bin",
-    "device_id": "gateway"
+    "device_id": "2"
   }
 }
 ```
@@ -195,26 +188,33 @@ if (ota_task_start() == 0) {
 }
 
 // 方式2：使用动态配置启动OTA任务
-if (ota_task_start_with_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == 0) {
+if (ota_task_start_with_config("/firmware/v2.0/device.bin", "1") == 0) {
     printf("动态配置OTA任务启动成功\n");
-} else if (ota_task_start_with_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == -2) {
+} else if (ota_task_start_with_config("/firmware/v2.0/device.bin", "1") == -2) {
     printf("设备ID不匹配，此设备不需要升级\n");
 } else {
     printf("动态配置OTA任务启动失败\n");
 }
 
 // 方式3：单独设置配置后启动
-if (ota_set_config("192.168.1.100", 8080, "/firmware/v2.0/device.bin", "gateway") == 0) {
+if (ota_set_config("/firmware/v2.0/device.bin", "1") == 0) {
     if (ota_task_start() == 0) {
         printf("配置设置成功，OTA任务启动成功\n");
     }
 }
 
 // 方式4：检查设备ID是否匹配
-if (ota_check_device_id("gateway")) {
+if (ota_check_device_id("1")) {
     printf("设备ID匹配，可以进行OTA升级\n");
 } else {
     printf("设备ID不匹配，跳过OTA升级\n");
+}
+
+// 方式5：检查子设备ID
+if (ota_check_device_id("5")) {
+    printf("子设备ID 5匹配\n");
+} else {
+    printf("子设备ID 5不匹配当前设备\n");
 }
 
 
@@ -248,7 +248,7 @@ if (ota_check_device_id("gateway")) {
 
 ### 参数解析问题修复
 
-**问题描述**：MQTT命令中提供的参数（如 `server_port: 7998`）被忽略，系统使用默认值（如端口7999）。
+**问题描述**：MQTT命令中提供的参数被忽略，系统使用默认值。
 
 **原因分析**：原有的参数解析逻辑要求所有参数都必须提供才会使用动态配置，否则直接使用硬编码的默认值，导致部分提供的参数被忽略。
 

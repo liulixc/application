@@ -19,8 +19,9 @@
 #include "partition.h"
 #include "upg_porting.h"
 #include "ota_task.h"
+#include "bms_slave.h"
 
-#define WIFI_TASK_STACK_SIZE 0x2000
+#define OTA_TASK_STACK_SIZE 0x2000
 #define RECV_BUFFER_SIZE     1024
 #define DELAY_TIME_MS 100
 #define HTTPC_DEMO_RECV_BUFSIZE 200  
@@ -31,11 +32,15 @@
 
 // #define SERVER_HOST   "quan.suning.com"
 #define SERVER_IP     "1.13.92.135"//无法使用dns时采用手动ping解析域名
-static const char *g_request = 
+
+#define MAX_REQUEST_SIZE 512
+static char g_request[MAX_REQUEST_SIZE] = 
     "GET /api/firmware/download/slave.fwpkg HTTP/1.1\r\n"
     "Host: 1.13.92.135:7998\r\n"  // 必须添加 Host 头
     "Connection: close\r\n"
-    "\r\n";char response[HTTPC_DEMO_RECV_BUFSIZE];
+    "\r\n";
+
+char response[HTTPC_DEMO_RECV_BUFSIZE];
 
 uint8_t recv_buffer[RECV_BUFFER_SIZE] = {0};
 
@@ -287,7 +292,31 @@ int http_clienti_get(const char *argument) {
     lwip_close(sockfd);
     return 0;
 }
+
+/**
+ * @brief 更新固件下载路径
+ * @param firmware_path 新的固件路径
+ */
+void ota_update_firmware_path(const char *firmware_path)
+{
+    if (firmware_path == NULL) {
+        printf("[ota_update_firmware_path] Invalid firmware path\r\n");
+        return;
+    }
+    
+    // 构建新的HTTP请求
+    snprintf(g_request, MAX_REQUEST_SIZE,
+        "GET %s HTTP/1.1\r\n"
+        "Host: %s:7998\r\n"
+        "Connection: close\r\n"
+        "\r\n",
+        firmware_path, SERVER_IP);
+    
+    printf("[ota_update_firmware_path] Updated request: %s\r\n", g_request);
+}
 //---------------------http------------------------------//
+
+
 
 
 /**
@@ -296,19 +325,18 @@ int http_clienti_get(const char *argument) {
  */
 int ota_task_start(void)
 {
-
-    osThreadAttr_t attr;
-    attr.name = "OTA_task";
-    attr.attr_bits = 0U;
-    attr.cb_mem = NULL;
-    attr.cb_size = 0U;
-    attr.stack_mem = NULL;
-    attr.stack_size = WIFI_TASK_STACK_SIZE;
-    attr.priority = osPriorityNormal;
-    if (osThreadNew((osThreadFunc_t)http_clienti_get, NULL, &attr) == NULL) {
-        osal_printk("Create OTA task fail.\r\n");
-        return -1;
+    uint32_t ret;
+    bms_thread_stop();
+    osal_task *task_handle = NULL;
+    // 加锁，防止多线程冲突
+    osal_kthread_lock();
+    // 创建MQTT主任务
+    task_handle = osal_kthread_create((osal_kthread_handler)http_clienti_get, 0, "OTA_task", OTA_TASK_STACK_SIZE);
+    if (task_handle != NULL) {
+        osal_kthread_set_priority(task_handle, 17);
+        osal_kfree(task_handle);
     }
-    osal_printk("Create OTA task succ.\r\n");
-    return 0;
+    osal_kthread_unlock();
 }
+
+

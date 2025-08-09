@@ -23,4 +23,10 @@ int http_clienti_get(const char *argument);
  */
 int ota_task_start(void);
 
+/**
+ * @brief 更新固件下载路径
+ * @param firmware_path 新的固件路径
+ */
+void ota_update_firmware_path(const char *firmware_path);
+
 #endif // OTA_TASK_H

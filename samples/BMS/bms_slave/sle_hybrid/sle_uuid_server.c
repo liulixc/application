@@ -337,7 +337,69 @@
     // 检查是否为ota_upgrade命令
     if (strcmp(command_name->valuestring, "ota_upgrade") == 0) {
         printf("[ssaps_write_request_cbk] OTA upgrade command received\r\n");
-        ota_task_start();
+        
+        // 解析paras对象
+        cJSON *paras = cJSON_GetObjectItem(json, "paras");
+        if (cJSON_IsObject(paras)) {
+            // 解析firmware_path参数
+            cJSON *firmware_path = cJSON_GetObjectItem(paras, "firmware_path");
+            if (firmware_path && cJSON_IsString(firmware_path)) {
+                printf("[ssaps_write_request_cbk] Firmware path: %s\r\n", firmware_path->valuestring);
+                // 更新g_request中的路径
+                ota_update_firmware_path(firmware_path->valuestring);
+            }
+            
+            // 检查是否有device_id参数
+            cJSON *device_id = cJSON_GetObjectItem(paras, "device_id");
+            if (device_id && (cJSON_IsString(device_id) || cJSON_IsNumber(device_id))) {
+                // 获取本机MAC地址后两位作为设备ID
+                sle_addr_t *local_addr = hybrid_get_local_addr();
+                char local_device_id[3];
+                snprintf(local_device_id, sizeof(local_device_id), "%02X", local_addr->addr[5]);
+                
+                // 将device_id转换为统一格式进行比较
+                char target_device_id[16];
+                if (cJSON_IsString(device_id)) {
+                    // 检查字符串是否为数字，如果是则转换为两位十六进制格式
+                    const char *str_value = device_id->valuestring;
+                    if (strcmp(str_value, "all") == 0 || strcmp(str_value, "*") == 0) {
+                        strncpy(target_device_id, str_value, sizeof(target_device_id) - 1);
+                        target_device_id[sizeof(target_device_id) - 1] = '\0';
+                    } else {
+                        // 尝试将字符串转换为数字，然后格式化为两位十六进制
+                        int num_value = atoi(str_value);
+                        snprintf(target_device_id, sizeof(target_device_id), "%02X", num_value);
+                    }
+                } else {
+                    snprintf(target_device_id, sizeof(target_device_id), "%02X", (int)device_id->valuedouble);
+                }
+                
+                printf("[ssaps_write_request_cbk] Target device_id: %s, Local device_id: %s\r\n", 
+                       target_device_id, local_device_id);
+                
+                // 检查设备ID是否匹配
+                if (strcmp(target_device_id, local_device_id) == 0 || 
+                    strcmp(target_device_id, "all") == 0 || 
+                    strcmp(target_device_id, "*") == 0) {
+                    // 设备ID匹配，执行OTA升级
+                    printf("[ssaps_write_request_cbk] Device ID matches, starting OTA upgrade\r\n");
+                    ota_task_start();
+                } else {
+                    // 设备ID不匹配，转发给子节点
+                    printf("[ssaps_write_request_cbk] Device ID does not match, forwarding to child nodes\r\n");
+                    sle_client_send_command_to_children(write_cb_para->value, write_cb_para->length);
+                }
+            } else {
+                // 没有device_id参数，默认执行OTA升级
+                printf("[ssaps_write_request_cbk] No device_id specified, starting OTA upgrade\r\n");
+                ota_task_start();
+            }
+        } else {
+            // 没有paras对象，默认执行OTA升级
+            printf("[ssaps_write_request_cbk] No paras object, starting OTA upgrade\r\n");
+            ota_task_start();
+        }
+        
         cJSON_Delete(json);
         osal_vfree(json_str);
         return;

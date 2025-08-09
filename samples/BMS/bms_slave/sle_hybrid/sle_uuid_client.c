@@ -299,13 +299,15 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
     osal_printk("%s [DATA RECV] from child conn_id %u. Data: %s\r\n",SLE_CLIENT_LOG,conn_id,(char*)data->data);
 
     // 如果当前节点是“成员”，则必须将数据包原封不动地转发给父节点
-    if (hybrid_node_get_role() == NODE_ROLE_MEMBER) {
+    if (hybrid_node_get_role() == NODE_ROLE_MEMBER && mutex) {  
         osal_printk("%s [DATA FORWARD] Relaying data to parent...\r\n", SLE_CLIENT_LOG);
+        mutex=0;
         // 转发收到的原始数据包（即JSON字符串）
         errcode_t ret = sle_hybrids_send_data(data->data, data->data_len);
         if (ret != ERRCODE_SUCC) {
             osal_printk("%s Failed to forward data to parent. Error: %d\r\n", SLE_CLIENT_LOG, ret);
         }
+        mutex=1;
     }
 }
  
@@ -388,7 +390,18 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
                  .data = data,
              };
              
-             errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+             if(mutex)
+             {
+                mutex=0;
+                errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+                mutex=1;
+             }
+             else
+             {
+                while(!mutex);
+                errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+             }
+             
              if (ret != ERRCODE_SUCC) {
                  osal_printk("%s Failed to send command to child %d (conn_id:%u): %d\r\n", 
                             SLE_CLIENT_LOG, i, g_child_nodes[i].conn_id, ret);
