@@ -1,45 +1,46 @@
 /**
  * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2023-2023. All rights reserved.
  *
- * Description: PINCTRL Sample Source. \n
+ * Description: PINCTRLå¼•è„šæ§åˆ¶ç¤ºä¾‹æºæ–‡ä»¶
+ * æœ¬æ–‡ä»¶æ¼”ç¤ºäº†å¦‚ä½•ä½¿ç”¨PINCTRLæ¨¡å—è¿›è¡Œå¼•è„šæ¨¡å¼ã€é©±åŠ¨å¼ºåº¦å’Œä¸Šä¸‹æ‹‰çŠ¶æ€çš„é…ç½®å’Œè·å–æ“ä½œ
  *
- * History: \n
- * 2023-07-27, Create file. \n
+ * History:
+ * 2023-07-27, Create file.
  */
 #include "pinctrl.h"
 #include "common_def.h"
 #include "soc_osal.h"
 #include "app_init.h"
 
-#define PINCTRL_PIN_MODE            5   // ÒªÉèÖÃµÄÒı½ÅÄ£Ê½
-#define PINCTRL_PIN_DS              3   // ÒªÉèÖÃµÄÇı¶¯ÄÜÁ¦
-#define PINCTRL_PIN_PULL            2   // ÒªÉèÖÃµÄÉÏÏÂÀ­×´Ì¬
+#define PINCTRL_PIN_MODE            5   // è¦è®¾ç½®çš„å¼•è„šæ¨¡å¼
+#define PINCTRL_PIN_DS              3   // è¦è®¾ç½®çš„é©±åŠ¨å¼ºåº¦
+#define PINCTRL_PIN_PULL            2   // è¦è®¾ç½®çš„ä¸Šä¸‹æ‹‰çŠ¶æ€
 
-#define PINCTRL_TASK_PRIO           24  // ÈÎÎñÓÅÏÈ¼¶
-#define PINCTRL_TASK_STACK_SIZE     0x1000 // ÈÎÎñÕ»´óĞ¡
+#define PINCTRL_TASK_PRIO           24  // ä»»åŠ¡ä¼˜å…ˆçº§
+#define PINCTRL_TASK_STACK_SIZE     0x1000 // ä»»åŠ¡æ ˆå¤§å°
 
 /**
- * @brief PINCTRLÑİÊ¾ÈÎÎñ
- * ÒÀ´ÎÑİÊ¾Òı½ÅÄ£Ê½¡¢Çı¶¯ÄÜÁ¦¡¢ÉÏÏÂÀ­µÄ»ñÈ¡ÓëÉèÖÃÁ÷³Ì¡£
- * @param arg ÈÎÎñ²ÎÊı£¬Î´Ê¹ÓÃ
+ * @brief PINCTRLæ¼”ç¤ºä»»åŠ¡
+ * æœ¬å‡½æ•°æ¼”ç¤ºå¼•è„šæ¨¡å¼ã€é©±åŠ¨å¼ºåº¦å’Œä¸Šä¸‹æ‹‰çŠ¶æ€çš„è·å–å’Œè®¾ç½®è¿‡ç¨‹ã€‚
+ * @param arg ä»»åŠ¡å‚æ•°ï¼Œæœªä½¿ç”¨
  * @return NULL
  */
 static void *pinctrl_task(const char *arg)
 {
-    unused(arg); // ·ÀÖ¹Î´Ê¹ÓÃ²ÎÊı¸æ¾¯
-    pin_t pin = CONFIG_PINCTRL_USE_PIN; // »ñÈ¡ÅäÖÃµÄÑİÊ¾Òı½Å±àºÅ
+    unused(arg); // é˜²æ­¢æœªä½¿ç”¨å‚æ•°è­¦å‘Š
+    pin_t pin = CONFIG_PINCTRL_USE_PIN; // è·å–é…ç½®çš„æ¼”ç¤ºå¼•è„šç¼–å·
     pin_mode_t mode;
     pin_drive_strength_t ds;
     pin_pull_t pull;
 
-    /* PINCTRL init. ³õÊ¼»¯PINCTRLÄ£¿é */
+    /* PINCTRL init. åˆå§‹åŒ–PINCTRLæ¨¡å— */
     uapi_pin_init();
 
-    // 1. »ñÈ¡²¢´òÓ¡µ±Ç°Òı½ÅÄ£Ê½
+    // 1. è·å–å¹¶æ‰“å°å½“å‰å¼•è„šæ¨¡å¼
     osal_printk("start get pin<%d> mode!\r\n", pin);
     mode = uapi_pin_get_mode(pin);
     osal_printk("the mode of pin<%d> is %d.\r\n", pin, mode);
-    // 2. ÉèÖÃÒı½ÅÄ£Ê½²¢Ğ£Ñé
+    // 2. è®¾ç½®å¼•è„šæ¨¡å¼å¹¶æ ¡éªŒ
     mode = PINCTRL_PIN_MODE;
     osal_printk("start set pin<%d> mode<%d>!\r\n", pin, mode);
     if (uapi_pin_set_mode(pin, mode) == ERRCODE_SUCC && uapi_pin_get_mode(pin) == mode) {
@@ -47,11 +48,11 @@ static void *pinctrl_task(const char *arg)
     }
 
     osal_printk("\r\n");
-    // 3. »ñÈ¡²¢´òÓ¡µ±Ç°Çı¶¯ÄÜÁ¦
+    // 3. è·å–å¹¶æ‰“å°å½“å‰é©±åŠ¨å¼ºåº¦
     osal_printk("start get pin<%d> driver-strength!\r\n", pin);
     ds = uapi_pin_get_ds(pin);
     osal_printk("The driver-strength of pin<%d> is %d.\r\n", pin, ds);
-    // 4. ÉèÖÃÇı¶¯ÄÜÁ¦²¢Ğ£Ñé
+    // 4. è®¾ç½®é©±åŠ¨å¼ºåº¦å¹¶æ ¡éªŒ
     ds = PINCTRL_PIN_DS;
     osal_printk("start set pin<%d> driver-strength<%d>!\r\n", pin, ds);
     if (uapi_pin_set_ds(pin, ds) == ERRCODE_SUCC && uapi_pin_get_ds(pin) == ds) {
@@ -59,40 +60,40 @@ static void *pinctrl_task(const char *arg)
     }
 
     osal_printk("\r\n");
-    // 5. »ñÈ¡²¢´òÓ¡µ±Ç°ÉÏÏÂÀ­×´Ì¬
+    // 5. è·å–å¹¶æ‰“å°å½“å‰ä¸Šä¸‹æ‹‰çŠ¶æ€
     osal_printk("start get pin<%d> pull/down status!\r\n", pin);
     pull = uapi_pin_get_pull(pin);
     osal_printk("The pull/down status of pin<%d> is %d.\r\n", pin, pull);
-    // 6. ÉèÖÃÉÏÏÂÀ­×´Ì¬²¢Ğ£Ñé
+    // 6. è®¾ç½®ä¸Šä¸‹æ‹‰çŠ¶æ€å¹¶æ ¡éªŒ
     pull = PINCTRL_PIN_PULL;
     osal_printk("start set pin<%d> pull/down status<%d>!\r\n", pin, pull);
     if (uapi_pin_set_pull(pin, pull) == ERRCODE_SUCC && uapi_pin_get_pull(pin) == pull) {
         osal_printk("set pin<%d> pull/down status<%d> succ.\r\n", pin, pull);
     }
 
-    /* PINCTRL deinit. ·´³õÊ¼»¯£¬ÊÍ·Å×ÊÔ´ */
+    /* PINCTRL deinit. ååˆå§‹åŒ–å¹¶é‡Šæ”¾èµ„æº */
     uapi_pin_deinit();
 
     return NULL;
 }
 
 /**
- * @brief PINCTRLÑİÊ¾Èë¿Ú£¬´´½¨²¢Æô¶¯pinctrl_taskÈÎÎñ
+ * @brief PINCTRLæ¼”ç¤ºå…¥å£ï¼Œåˆ›å»ºå¹¶å¯åŠ¨pinctrl_taskä»»åŠ¡
  */
 static void pinctrl_entry(void)
 {
     osal_task *task_handle = NULL;
-    osal_kthread_lock(); // ½øÈëÁÙ½çÇø£¬·ÀÖ¹¶àÏß³Ì³åÍ»
-    // ´´½¨ÈÎÎñ£¬ÈÎÎñº¯ÊıÎªpinctrl_task
+    osal_kthread_lock(); // è·å–ä¸´ç•ŒåŒºé”ï¼Œé˜²æ­¢çº¿ç¨‹å†²çª
+    // åˆ›å»ºä»»åŠ¡ï¼Œå¤„ç†å‡½æ•°ä¸ºpinctrl_task
     task_handle = osal_kthread_create((osal_kthread_handler)pinctrl_task, 0, "PinctrlTask", PINCTRL_TASK_STACK_SIZE);
     if (task_handle != NULL) {
-        osal_kthread_set_priority(task_handle, PINCTRL_TASK_PRIO); // ÉèÖÃÈÎÎñÓÅÏÈ¼¶
-        osal_kfree(task_handle); // ÊÍ·ÅÈÎÎñ¾ä±úÄÚ´æ
+        osal_kthread_set_priority(task_handle, PINCTRL_TASK_PRIO); // è®¾ç½®ä»»åŠ¡ä¼˜å…ˆçº§
+        osal_kfree(task_handle); // é‡Šæ”¾ä»»åŠ¡å¥æŸ„å†…å­˜
     }
-    osal_kthread_unlock(); // ÍË³öÁÙ½çÇø
+    osal_kthread_unlock(); // é€€å‡ºä¸´ç•ŒåŒº
 }
 
 /*
- * @brief Ó¦ÓÃÈë¿Ú£¬ÔËĞĞpinctrl_entry£¬Æô¶¯PINCTRLÑİÊ¾
+ * @brief åº”ç”¨å…¥å£ï¼Œè°ƒç”¨pinctrl_entryå¯åŠ¨PINCTRLæ¼”ç¤º
  */
 app_run(pinctrl_entry);
