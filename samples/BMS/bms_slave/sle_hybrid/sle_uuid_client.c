@@ -53,6 +53,8 @@
  // 远程服务器地址管理
  static sle_addr_t g_remote_server_addrs[MAX_REMOTE_SERVERS] = {0};
  static uint8_t g_remote_server_count = 0;
+
+ extern int mutex;
  
  /*==============================================================================
   * 内部函数声明
@@ -390,16 +392,17 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
                  .data = data,
              };
              
+             errcode_t ret=0;
              if(mutex)
              {
                 mutex=0;
-                errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+                ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
                 mutex=1;
              }
              else
              {
                 while(!mutex);
-                errcode_t ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
+                ret = ssapc_write_req(g_client_id, g_child_nodes[i].conn_id, &param);
              }
              
              if (ret != ERRCODE_SUCC) {
@@ -442,7 +445,19 @@ static void sle_client_find_structure_cmp_cbk(uint8_t client_id, uint16_t conn_i
          .data_len = sizeof(cmd),
          .data = (uint8_t *)&cmd,
      };
-     errcode_t ret = ssapc_write_req(g_client_id, conn_id, &param);
+
+    errcode_t ret=0;
+    if(mutex)
+    {
+        mutex=0;
+        ret = ssapc_write_req(g_client_id, conn_id, &param);
+        mutex=1;
+    }
+    else
+    {
+        while(!mutex);
+        ret = ssapc_write_req(g_client_id, conn_id, &param);
+    }
      if (ret != ERRCODE_SUCC) {
          osal_printk("%s Failed to send adoption command: %d\r\n", SLE_CLIENT_LOG, ret);
      } else {

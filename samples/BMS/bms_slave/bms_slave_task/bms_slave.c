@@ -1099,6 +1099,8 @@ uint16_t LTC6804_Calculate_Temperature(float adc_value) {
 
 extern network_adv_data_t g_network_status;
 bms_thread_running = true;
+extern int mutex;
+
 void *bms_salve_task(void)
 {
     uapi_watchdog_disable();
