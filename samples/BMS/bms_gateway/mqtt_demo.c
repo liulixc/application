@@ -341,11 +341,22 @@ int mqtt_task(void)
     int ret = 0;
     int loop_counter = 0; // 循环计数器，用于控制WiFi检查间隔
     
+    // // 组合上报主题字符串
+    char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
+
+    // 组合上报主题字符串
+    char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
     // 连接WiFi
     if (wifi_connect(g_wifi_ssid, g_wifi_pwd) != 0) {
         printf("wifi connect failed\\n");
         // WiFi连接失败，切换到4G
         switch_to_4g();
+        char ota_progress_payload[128];
+                snprintf(ota_progress_payload, sizeof(ota_progress_payload), 
+                        "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"OTA\":%u}}]}", 0);
+                
+                L610_HuaweiCloudReport("$oc/devices/680b91649314d11851158e8d_Battery01/sys/properties/report", ota_progress_payload);
+                osal_printk("[L610 OTA]: Progress reported: %u%%\r\n", 0);
     }else{
         // 连接MQTT服务器
         ret = mqtt_connect();
@@ -362,12 +373,19 @@ int mqtt_task(void)
         } else {
             printf("combine_strings failed for cmd_topic\n");
         }
-    }
-    // // 组合上报主题字符串
-    // char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
 
-    // 组合上报主题字符串
-    char *gate_report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/gateway/sub_devices/properties/report");
+    // 构建OTA进度上报的JSON格式数据
+            char ota_progress_payload[256];
+            snprintf(ota_progress_payload, sizeof(ota_progress_payload),
+                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"OTA\":%d}}]}",
+                0);
+            
+            // 通过MQTT上报OTA进度
+            mqtt_publish(report_topic, ota_progress_payload);
+            osal_printk("[OTA上报] 进度已上报: 0%%\r\n");
+    }
+    
+
 
 
     while (1) {
@@ -395,7 +413,7 @@ int mqtt_task(void)
             // 检查是否为OTA升级命令
             if (strstr(current_cmd.cmd_msg.receive_payload, "\"command_name\":\"ota_upgrade\"") != NULL) {
                 printf("[OTA] 收到OTA升级命令，解析参数\n");
-                
+                 
                 // 解析JSON获取OTA配置参数
                 cJSON *json = cJSON_Parse(current_cmd.cmd_msg.receive_payload);
                 if (json != NULL) {
@@ -406,8 +424,26 @@ int mqtt_task(void)
                             
                             // 提取参数，使用提供的值或默认值
                             const char *path = (firmware_path && cJSON_IsString(firmware_path)) ? firmware_path->valuestring : "/api/firmware/download/test.bin";
-                            const char *dev_id = (device_id && cJSON_IsString(device_id)) ? device_id->valuestring : "1";
                             
+                            // 处理device_id，支持字符串和数字类型
+                            char dev_id_buffer[16];
+                            const char *dev_id;
+                            if (device_id) {
+                                if (cJSON_IsString(device_id)) {
+                                    dev_id = device_id->valuestring;
+                                } else if (cJSON_IsNumber(device_id)) {
+                                    snprintf(dev_id_buffer, sizeof(dev_id_buffer), "%d", (int)device_id->valuedouble);
+                                    dev_id = dev_id_buffer;
+                                } else {
+                                    dev_id = "1"; // 默认值
+                                }
+                            } else {
+                                dev_id = "1"; // 默认值
+                            }
+                            
+                            printf("[OTA] JSON解析结果: device_id类型=%s, 原始值=%s\n", 
+                                   device_id ? (cJSON_IsString(device_id) ? "字符串" : cJSON_IsNumber(device_id) ? "数字" : "其他") : "空",
+                                   device_id ? (cJSON_IsString(device_id) ? device_id->valuestring : cJSON_IsNumber(device_id) ? "数字值" : "未知") : "无");
                             printf("[OTA] 使用配置: Path=%s, DeviceID=%s\n", path, dev_id);
                             
                             // 判断是否为网关自身的升级（设备ID为1）

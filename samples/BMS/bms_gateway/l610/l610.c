@@ -290,23 +290,42 @@ int l610_ota_process_upgrade_command(const char* payload)
         // 解析firmware_path
         char* firmware_path_start = strstr(payload, "\"firmware_path\":");
         if (firmware_path_start) {
-            firmware_path_start = strchr(firmware_path_start, '"');
-            if (firmware_path_start) {
-                firmware_path_start = strchr(firmware_path_start + 1, '"');
-                if (firmware_path_start) {
-                    firmware_path_start++; // 跳过引号
-                    char* firmware_path_end = strchr(firmware_path_start, '"');
-                    if (firmware_path_end) {
-                        int path_len = firmware_path_end - firmware_path_start;
+            osal_printk("[L610 OTA]: Found firmware_path field\r\n");
+            
+            // 找到冒号后的第一个引号
+            char* colon_pos = strchr(firmware_path_start, ':');
+            if (colon_pos) {
+                char* first_quote = strchr(colon_pos, '"');
+                if (first_quote) {
+                    // 跳过第一个引号，指向路径内容的开始
+                    char* path_start = first_quote + 1;
+                    // 找到路径结束的引号
+                    char* path_end = strchr(path_start, '"');
+                    if (path_end) {
+                        int path_len = path_end - path_start;
                         if (path_len > 0 && path_len < 256) {
+                            // 打印调试信息
+                            osal_printk("[L610 OTA]: Extracted path length: %d\r\n", path_len);
+                            osal_printk("[L610 OTA]: Path content: %.*s\r\n", path_len, path_start);
+                            
                             // 构建完整的固件URL
                             snprintf(g_l610_ota_ctx.firmware_url, sizeof(g_l610_ota_ctx.firmware_url), 
-                                    "http://1.13.92.135:7998%.*s", path_len, firmware_path_start);
+                                    "http://1.13.92.135:7998%.*s", path_len, path_start);
                             osal_printk("[L610 OTA]: Firmware URL set to: %s\r\n", g_l610_ota_ctx.firmware_url);
+                        } else {
+                            osal_printk("[L610 OTA]: Invalid path length: %d\r\n", path_len);
                         }
+                    } else {
+                        osal_printk("[L610 OTA]: Path end quote not found\r\n");
                     }
+                } else {
+                    osal_printk("[L610 OTA]: First quote after colon not found\r\n");
                 }
+            } else {
+                osal_printk("[L610 OTA]: Colon after firmware_path not found\r\n");
             }
+        } else {
+            osal_printk("[L610 OTA]: firmware_path field not found in payload\r\n");
         }
         
         // 4G模块只处理网关升级，不需要解析device_id

@@ -122,7 +122,7 @@ void l610_ota_task_thread(void *argument)
                     snprintf(reply_topic, sizeof(reply_topic), 
                                 MQTT_CLIENT_RESPONSE, 
                                 request_id);
-                    L610_HuaweiCloudReport(reply_topic, "{\"result_code\":0,\"response_name\":\"OTA_START\"}");
+                    L610_HuaweiCloudReport(reply_topic, "{\"result_code\":0,\"response_name\":\"switch_forward\"}");
                     
                     // 释放request_id内存
                     free(request_id);
@@ -147,6 +147,22 @@ void l610_ota_task_thread(void *argument)
     l610_ota_prepare(total_file_size);
     // 分块下载剩余数据
      while (received_size < total_file_size) {
+        
+        // 计算并上报OTA进度
+        uint32_t current_percent = (received_size * 100) / total_file_size;
+
+        char ota_progress_payload[128];
+        snprintf(ota_progress_payload, sizeof(ota_progress_payload), 
+                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"OTA\":%u}}]}", current_percent);
+        
+        char ota_topic[128];
+        snprintf(ota_topic, sizeof(ota_topic), 
+                "$oc/devices/%s/sys/properties/report", g_l610_ota_ctx.client_id);
+        
+        L610_HuaweiCloudReport(ota_topic, ota_progress_payload);
+        osal_printk("[L610 OTA]: Progress reported: %u%%\r\n", current_percent);
+
+        
          uint32_t chunk_start = received_size;
          uint32_t chunk_end = chunk_start + L610_OTA_CHUNK_SIZE - 1;
          if (chunk_end >= total_file_size) {
@@ -272,7 +288,20 @@ void l610_ota_task_thread(void *argument)
     
     // 升级流程
     if (received_size >= total_file_size) {
+        // 上报OTA完成，进度100%
+        char ota_complete_payload[128];
+        snprintf(ota_complete_payload, sizeof(ota_complete_payload), 
+                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"OTA\":100}}]}");
+        
+        char ota_topic[128];
+        snprintf(ota_topic, sizeof(ota_topic), 
+                "$oc/devices/%s/sys/properties/report", g_l610_ota_ctx.client_id);
+        
+        L610_HuaweiCloudReport(ota_topic, ota_complete_payload);
+        osal_printk("[L610 OTA]: OTA complete reported: 100%%\r\n");
+        
         osal_printk("[L610 OTA]: recv all data succ, total size: %u\r\n", total_file_size);
+        L610_Detach(1);
         errcode_t ret = uapi_upg_request_upgrade(false);
         if (ret == ERRCODE_SUCC) {
             osal_printk("[L610 OTA]: Upgrade request successful. Rebooting...\r\n");

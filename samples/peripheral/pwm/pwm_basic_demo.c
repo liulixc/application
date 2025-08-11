@@ -1,25 +1,36 @@
 /**
+ * @file pwm_basic_demo.c
+ * @brief PWM基础演示程序
+ * 
  * Copyright (c) HiSilicon (Shanghai) Technologies Co., Ltd. 2023-2023. All rights reserved.
  *
- * Description: PWM Sample Source. \n
- *
- * History: \n
- * 2023-06-27, Create file. \n
+ * 本文件实现了PWM模块的基础功能演示，包括：
+ * - PWM初始化和配置
+ * - PWM通道开启和关闭
+ * - PWM中断处理
+ * - PWM组功能使用（适用于V151版本）
+ * 
+ * 该演示程序展示了PWM的基本使用方法，适合初学者了解PWM模块的工作原理。
+ * 
+ * History:
+ * 2023-06-27, Create file.
  */
+// ==================== 头文件包含 ====================
 #if defined(CONFIG_PWM_SUPPORT_LPM)
-#include "pm_veto.h"
+#include "pm_veto.h"          // 低功耗管理相关头文件
 #endif
-#include "common_def.h"
-#include "pinctrl.h"
-#include "pwm.h"
-#include "tcxo.h"
-#include "soc_osal.h"
-#include "app_init.h"
 
-#define TEST_TCXO_DELAY_1000MS     1000
+#include "common_def.h"        // 通用定义和宏
+#include "pinctrl.h"           // 引脚控制接口
+#include "pwm.h"               // PWM驱动接口
+#include "tcxo.h"              // 晶振控制接口
+#include "soc_osal.h"          // 操作系统抽象层
+#include "app_init.h"          // 应用初始化接口
 
-#define PWM_TASK_PRIO              24
-#define PWM_TASK_STACK_SIZE        0x1000
+// ==================== 宏定义 ====================
+#define TEST_TCXO_DELAY_1000MS     1000    // 测试延时1000毫秒
+#define PWM_TASK_PRIO              24      // PWM任务优先级
+#define PWM_TASK_STACK_SIZE        0x1000  // PWM任务栈大小（4KB）
 
 static errcode_t pwm_sample_callback(uint8_t channel)
 {
@@ -30,12 +41,18 @@ static errcode_t pwm_sample_callback(uint8_t channel)
 static void *pwm_task(const char *arg)
 {
     UNUSED(arg);
+    // PWM配置结构体
+    // low_time: 100 (低电平时间)
+    // high_time: 100 (高电平时间) 
+    // offset_time: 0 (偏移时间)
+    // cycles: 0xFF (周期数：255个周期)
+    // repeat: false (不重复执行)
     pwm_config_t cfg_no_repeat = {
-        100,
-        100,
-        0,
-        0xFF,
-        false
+        .low_time = 100,    // 低电平时间：100个时钟周期
+        .high_time = 100,   // 高电平时间：100个时钟周期
+        .offset_time = 0,   // 偏移时间：0
+        .cycles = 0xFF,     // 周期数：255个周期
+        .repeat = false     // 不重复执行
     };
 
     uapi_pin_set_mode(CONFIG_PWM_PIN, CONFIG_PWM_PIN_MODE);

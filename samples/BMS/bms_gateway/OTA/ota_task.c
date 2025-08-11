@@ -14,11 +14,13 @@
 #include "lwip/ip4_addr.h"
 #include "lwip/netdb.h"
 #include "unistd.h"
-#include "../wifi/wifi_connect.h"
+#include "wifi_connect.h"
 #include "upg.h"
 #include "partition.h"
 #include "upg_porting.h"
 #include "ota_task.h"
+#include "mqtt_demo.h"
+
 
 #define WIFI_TASK_STACK_SIZE 0x2000
 #define RECV_BUFFER_SIZE     1024
@@ -168,6 +170,7 @@ errcode_t ota_prepare(uint32_t file_size)
 //-------------------------ota----------------------------//
 
 //******************http**************************//
+extern char *g_username; // 设备ID
 
 
 int http_clienti_get(const char *argument) {
@@ -180,6 +183,7 @@ int http_clienti_get(const char *argument) {
     uint32_t file_size = 0;
     static int last_percent = -1;
 
+    char *report_topic = combine_strings(3, "$oc/devices/", g_username, "/sys/properties/report");
     // 构建HTTP请求
     if (build_http_request() != 0) {
         osal_printk("[ota task]: build HTTP request failed\r\n");
@@ -351,9 +355,19 @@ int http_clienti_get(const char *argument) {
         
         // 显示下载进度百分比
         int current_percent = (total_recieved * 100) / file_size;
-        if (current_percent != last_percent) {
+        if (current_percent != last_percent&&current_percent%10==0) {
             osal_printk("[OTA进度] %d%%\r\n", current_percent);
             last_percent = current_percent;
+            
+            // 构建OTA进度上报的JSON格式数据
+            char ota_progress_payload[256];
+            snprintf(ota_progress_payload, sizeof(ota_progress_payload),
+                "{\"services\":[{\"service_id\":\"ws63\",\"properties\":{\"OTA\":%d}}]}",
+                current_percent);
+            
+            // 通过MQTT上报OTA进度
+            mqtt_publish(report_topic, ota_progress_payload);
+            osal_printk("[OTA上报] 进度已上报: %d%%\r\n", current_percent);
         }
 
         // 超量保护（防止循环条件失效）
