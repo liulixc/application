@@ -508,7 +508,7 @@ int mqtt_task(void)
         }
         
         // 智能网络管理逻辑
-        if (loop_counter % 10 == 0) {  // 每10秒检查一次网络状态
+        if (loop_counter % 5 == 0) {  // 每5秒检查一次网络状态
             if (current_net == NET_TYPE_4G && !OTAing) {
                 // 当前是4G模式，检查WiFi是否可用
                 if (switch_to_wifi(g_wifi_ssid, g_wifi_pwd) == 1) {
@@ -544,7 +544,7 @@ int mqtt_task(void)
             L610_PublishBMSDevices(gate_report_topic, (volatile void *)g_env_msg, is_device_active, get_active_device_count);
         }
         
-        osal_msleep(500);
+        osal_msleep(1000);
         loop_counter++;
     }
     return ret;

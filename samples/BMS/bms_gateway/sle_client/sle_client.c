@@ -109,7 +109,7 @@ bool is_device_active[12] = {false}; // 设备活跃状态数组
  
  uint8_t get_active_device_count(void)
  {
-     uint8_t count = 0;
+     uint8_t count = 0; 
      for (int i = 0; i < 12; i++) {
          if (is_device_active[i]) {
              count++;

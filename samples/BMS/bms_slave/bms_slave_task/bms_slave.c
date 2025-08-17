@@ -1100,7 +1100,7 @@ uint16_t LTC6804_Calculate_Temperature(float adc_value) {
 extern network_adv_data_t g_network_status;
 bms_thread_running = true;
 extern int mutex;
-
+uint8_t count = 0;
 void *bms_salve_task(void)
 {
     uapi_watchdog_disable();
@@ -1194,55 +1194,62 @@ void *bms_salve_task(void)
             uapi_gpio_set_val(14, GPIO_LEVEL_LOW);
         }
 
-
-        // 构建BMS JSON字符串，返回json字符串指针和长度，需外部释放
-        // 构建 cell_voltages 数组
-        cJSON *cell_voltages = cJSON_CreateArray();
-        for (int i = 0; i < 12; i++) {
-            cJSON_AddItemToArray(cell_voltages, cJSON_CreateNumber(cell_codes[0][i]));
-        }
-        // 构建 temperatures 数组
-        cJSON *temperatures = cJSON_CreateArray();
-        for (int i = 0; i < 5; i++) {
-            cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(LTC6804_Calculate_Temperature(gpiocode[0][i])));
-        }
-        // 构建根对象
-        cJSON *root = cJSON_CreateObject();
-
-        // 将本机MAC地址后两位添加到JSON对象中
-        sle_addr_t *local_addr = hybrid_get_local_addr();
-        char mac_str[3]; // 只保留后两位，例如"0A"\0
-        (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02X",
-                 local_addr->addr[5]); // 只取MAC地址的最后一个字节
-        cJSON_AddStringToObject(root, "mac", mac_str);
-
-        cJSON_AddNumberToObject(root, "total", MOD_VOL);
-        cJSON_AddItemToObject(root, "cell", cell_voltages);
-        cJSON_AddItemToObject(root, "T", temperatures);
-        cJSON_AddNumberToObject(root, "current", Current); 
-        cJSON_AddNumberToObject(root, "SOC", SOC); // 300mV 压差均衡开关
-        cJSON_AddNumberToObject(root, "level", hybrid_node_get_level()); // 节点层级
-        cJSON_AddStringToObject(root, "child", get_children_mac_last2());
-
+        count++;
         
-        // 打印格式JSON
-        char *json_str = cJSON_Print(root);
-        // printf("BMS_JSON:%s\n", json_str);
-        
-        if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()&&bms_thread_running&&mutex) {
-            mutex=0;
-            osal_printk("Member node sending its own JSON data...\r\n");
-            // 直接发送JSON字符串，长度+1以包含末尾的'\0'
-            sle_hybrids_send_data((uint8_t*)json_str, strlen(json_str) + 1);
-            mutex=1;
+        if(count >= 4)
+        {
+            // 构建BMS JSON字符串，返回json字符串指针和长度，需外部释放
+            // 构建 cell_voltages 数组
+            cJSON *cell_voltages = cJSON_CreateArray();
+            for (int i = 0; i < 12; i++) {
+                cJSON_AddItemToArray(cell_voltages, cJSON_CreateNumber(cell_codes[0][i]));
+            }
+            // 构建 temperatures 数组
+            cJSON *temperatures = cJSON_CreateArray();
+            for (int i = 0; i < 5; i++) {
+                cJSON_AddItemToArray(temperatures, cJSON_CreateNumber(LTC6804_Calculate_Temperature(gpiocode[0][i])));
+            }
+            // 构建根对象
+            cJSON *root = cJSON_CreateObject();
 
+            // 将本机MAC地址后两位添加到JSON对象中
+            sle_addr_t *local_addr = hybrid_get_local_addr();
+            char mac_str[3]; // 只保留后两位，例如"0A"\0
+            (void)snprintf_s(mac_str, sizeof(mac_str), sizeof(mac_str) - 1, "%02X",
+                    local_addr->addr[5]); // 只取MAC地址的最后一个字节
+            cJSON_AddStringToObject(root, "mac", mac_str);
+
+            cJSON_AddNumberToObject(root, "total", MOD_VOL);
+            cJSON_AddItemToObject(root, "cell", cell_voltages);
+            cJSON_AddItemToObject(root, "T", temperatures);
+            cJSON_AddNumberToObject(root, "current", Current); 
+            cJSON_AddNumberToObject(root, "SOC", SOC); // 300mV 压差均衡开关
+            cJSON_AddNumberToObject(root, "level", hybrid_node_get_level()); // 节点层级
+            cJSON_AddStringToObject(root, "child", get_children_mac_last2());
+
+            
+            // 打印格式JSON
+            char *json_str = cJSON_Print(root);
+            // printf("BMS_JSON:%s\n", json_str);
+            
+            if (hybrid_node_get_role() == NODE_ROLE_MEMBER && sle_hybrids_is_client_connected()&&bms_thread_running&&mutex) {
+                mutex=0;
+                osal_printk("Member node sending its own JSON data...\r\n");
+                // 直接发送JSON字符串，长度+1以包含末尾的'\0'
+                sle_hybrids_send_data((uint8_t*)json_str, strlen(json_str) + 1);
+                mutex=1;
+
+            }
+
+            // 释放内存
+            cJSON_Delete(root);
+            free(json_str);
+            count = 0;
         }
-
-        // 释放内存
-        cJSON_Delete(root);
-        free(json_str);
         
         if(!bms_thread_running)break;
+
+
         osal_mdelay(500); // 适当延长发送间隔
     }
     return 0;

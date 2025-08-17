@@ -146,7 +146,7 @@ void sle_hybrid_task(char *arg)
     local_address.addr[2]=0x33;
     local_address.addr[3]=0x44;
     local_address.addr[4]=0x55;
-    local_address.addr[5]=0x02;
+    local_address.addr[5]=0x08;
     (void)memcpy_s(g_local_addr.addr, SLE_ADDR_LEN, local_address.addr, SLE_ADDR_LEN);
     g_local_addr.type = local_address.type;
     sle_set_local_addr(&g_local_addr);

@@ -25,16 +25,17 @@
 #include "app_init.h"          // 应用初始化接口
 #include "gpio.h"              // GPIO控制接口
 
-// ==================== 宏定义 ====================
-#define TEST_TCXO_DELAY_1000MS 1000    // 测试延时1000毫秒
-#define PWM_TASK_PRIO 24               // PWM任务优先级
-#define PWM_TASK_STACK_SIZE 0x1000     // PWM任务栈大小（4KB）
 
 // WS2812 LED控制相关配置
 #define CONFIG_PWM1_PIN 5              // PWM输出引脚号（GPIO5）
 #define CONFIG_PWM1_CHANNEL 5          // PWM通道号
 #define CONFIG_PWM1_PIN_MODE 1         // 引脚复用模式（PWM功能）
 #define CONFIG_PWM1_GROUP_ID 0         // PWM组ID
+
+#define CONFIG_PWM3_PIN 3              // PWM输出引脚号（GPIO5）
+#define CONFIG_PWM3_CHANNEL 3          // PWM通道号
+#define CONFIG_PWM3_PIN_MODE 1         // 引脚复用模式（PWM功能）
+#define CONFIG_PWM3_GROUP_ID 1         // PWM组ID
 
 // LED颜色和时序配置
 #define COLOR 255                      // LED最大亮度值（8位：0-255）
@@ -74,6 +75,25 @@ void set_code0(void)
   uapi_pwm_close(CONFIG_PWM1_GROUP_ID);
 }
 
+void set_code00(void)
+{
+  // 配置PWM参数以生成WS2812逻辑0信号
+  pwm_config_t cfg_no_repeat = {32, 68, 0, 1, false};
+  
+  // 打开PWM通道
+  uapi_pwm_open(CONFIG_PWM3_CHANNEL, &cfg_no_repeat);
+  
+  // 设置PWM组
+  uint8_t channel_id = CONFIG_PWM3_CHANNEL;
+  uapi_pwm_set_group(CONFIG_PWM3_GROUP_ID, &channel_id, 1);
+  
+  // 启动PWM组输出
+  uapi_pwm_start_group(CONFIG_PWM3_GROUP_ID);
+  
+  // 关闭PWM组
+  uapi_pwm_close(CONFIG_PWM3_GROUP_ID);
+}
+
 /**
  * @brief 发送WS2812逻辑1信号
  * 
@@ -108,6 +128,25 @@ void set_code1(void)
   uapi_pwm_close(CONFIG_PWM1_GROUP_ID);
 }
 
+void set_code11(void)
+{
+  // 配置PWM参数以生成WS2812逻辑1信号
+  pwm_config_t cfg_no_repeat = {68, 32, 0, 1, false};
+  
+  // 打开PWM通道
+  uapi_pwm_open(CONFIG_PWM3_CHANNEL, &cfg_no_repeat);
+  
+  // 设置PWM组
+  uint8_t channel_id = CONFIG_PWM3_CHANNEL;
+  uapi_pwm_set_group(CONFIG_PWM3_GROUP_ID, &channel_id, 1);
+  
+  // 启动PWM组输出
+  uapi_pwm_start_group(CONFIG_PWM3_GROUP_ID);
+  
+  // 关闭PWM组
+  uapi_pwm_close(CONFIG_PWM3_GROUP_ID);
+}
+
 /**
  * @brief 设置WS2812 LED的颜色
  * 
@@ -123,7 +162,7 @@ void set_code1(void)
  * 2. 红色8位数据（R7-R0）
  * 3. 蓝色8位数据（B7-B0）
  */
-static void pwm_color(uint8_t red, uint8_t green, uint8_t blue)
+ void pwm_color(uint8_t red, uint8_t green, uint8_t blue)
 {
   int code;
   
@@ -161,6 +200,44 @@ static void pwm_color(uint8_t red, uint8_t green, uint8_t blue)
   }
 }
 
+ void pwm_color1(uint8_t red, uint8_t green, uint8_t blue)
+{
+  int code;
+  
+  // 发送绿色分量数据（8位，从高位到低位）
+  for (int bit = 0; bit < 8; bit++) {
+      // 左移bit位后与0x80（10000000）进行与运算，检查最高位
+      code = (green << bit) & 0x80;
+      if (code != 0) {
+          set_code11();  // 发送逻辑1
+      } else {
+          set_code00();  // 发送逻辑0
+      }
+  }
+
+  // 发送红色分量数据（8位，从高位到低位）
+  for (int bit = 0; bit < 8; bit++) {
+      // 左移bit位后与0x80（10000000）进行与运算，检查最高位
+      code = (red << bit) & 0x80;
+      if (code != 0) {
+          set_code11();  // 发送逻辑1
+      } else {
+          set_code00();  // 发送逻辑0
+      }
+  }
+
+  // 发送蓝色分量数据（8位，从高位到低位）
+  for (int bit = 0; bit < 8; bit++) {
+      // 左移bit位后与0x80（10000000）进行与运算，检查最高位
+      code = (blue << bit) & 0x80;
+      if (code != 0) {
+          set_code11();  // 发送逻辑1
+      } else {
+          set_code00();  // 发送逻辑0
+      }
+  }
+}
+
 /**
  * @brief 复位WS2812 LED灯带
  * 
@@ -179,6 +256,7 @@ void reset_leds(void)
   // 打开PWM通道
   uapi_pwm_open(CONFIG_PWM1_CHANNEL, &cfg_reset);
 
+
   // 设置PWM组
   uint8_t channel_id = CONFIG_PWM1_CHANNEL;
   uapi_pwm_set_group(CONFIG_PWM1_GROUP_ID, &channel_id, 1);
@@ -188,6 +266,23 @@ void reset_leds(void)
 
   // 关闭PWM组
   uapi_pwm_close(CONFIG_PWM1_GROUP_ID);
+
+  
+
+  // 打开PWM通道
+  uapi_pwm_open(CONFIG_PWM3_CHANNEL, &cfg_reset);
+
+
+  // 设置PWM组
+  channel_id = CONFIG_PWM3_CHANNEL;
+  uapi_pwm_set_group(CONFIG_PWM3_GROUP_ID, &channel_id, 1);
+
+  // 启动PWM组输出复位信号
+  uapi_pwm_start_group(CONFIG_PWM3_GROUP_ID);
+
+  // 关闭PWM组
+  uapi_pwm_close(CONFIG_PWM3_GROUP_ID);
+
 }
 /**
  * @brief PWM任务主函数
@@ -202,6 +297,8 @@ void reset_leds(void)
  * 
  * @return NULL 任务函数返回值（未使用）
  */
+
+ extern int_flag;
 static void *pwm_task(void)
 {
   // 打印任务启动信息
@@ -224,17 +321,46 @@ static void *pwm_task(void)
 
   // 无限循环显示颜色
   while (1) {
-      // 显示红色（R=255, G=0, B=0）
-      pwm_color(COLOR, 0, 0);
-      osal_msleep(DELAY_MS);  // 延时1秒
-      
-      // 显示绿色（R=0, G=255, B=0）
-      pwm_color(0, COLOR, 0);
-      osal_msleep(DELAY_MS);  // 延时1秒
-      
-      // 显示蓝色（R=0, G=0, B=255）
-      pwm_color(0, 0, COLOR);
-      osal_msleep(DELAY_MS);  // 延时1秒
+
+    switch (int_flag)
+            {
+            case 1:
+                /* code */
+                pwm_color(COLOR, 0, 0);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                break;
+            case 2:
+                /* code */
+                // 显示绿色（R=0, G=255, B=0）
+                pwm_color(0, COLOR, 0);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                break;
+
+            case 3:
+                /* code */
+                // 显示蓝色（R=0, G=0, B=255）
+                pwm_color(0, 0, COLOR);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                break;
+
+            case 14:
+                // 显示红色（R=255, G=0, B=0）
+                pwm_color(COLOR, 0, 0);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                
+                // 显示绿色（R=0, G=255, B=0）
+                pwm_color(0, COLOR, 0);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                
+                // 显示蓝色（R=0, G=0, B=255）
+                pwm_color(0, 0, COLOR);
+                osal_msleep(DELAY_MS);  // 延时1秒
+                break;
+            
+
+            default:
+                break;
+            }
   }
   return NULL;
 }
@@ -252,29 +378,29 @@ static void *pwm_task(void)
  * - 栈大小：4KB (PWM_TASK_STACK_SIZE)
  * - 优先级：24 (PWM_TASK_PRIO)
  */
-static void pwm_entry(void)
-{
-  osal_task *task_handle = NULL;
+// static void pwm_entry(void)
+// {
+//   osal_task *task_handle = NULL;
   
-  // 锁定内核线程操作
-  osal_kthread_lock();
+//   // 锁定内核线程操作
+//   osal_kthread_lock();
   
-  // 创建PWM任务线程
-  task_handle = osal_kthread_create((osal_kthread_handler)pwm_task, 0, "PwmTask", PWM_TASK_STACK_SIZE);
+//   // 创建PWM任务线程
+//   task_handle = osal_kthread_create((osal_kthread_handler)pwm_task, 0, "PwmTask", PWM_TASK_STACK_SIZE);
   
-  // 如果任务创建成功，设置任务优先级
-  if (task_handle != NULL) {
-      osal_kthread_set_priority(task_handle, PWM_TASK_PRIO);
-  }
+//   // 如果任务创建成功，设置任务优先级
+//   if (task_handle != NULL) {
+//       osal_kthread_set_priority(task_handle, PWM_TASK_PRIO);
+//   }
   
-  // 解锁内核线程操作
-  osal_kthread_unlock();
-}
+//   // 解锁内核线程操作
+//   osal_kthread_unlock();
+// }
 
-/**
- * @brief 程序主入口
- * 
- * 通过app_run宏启动PWM演示应用程序。
- * 该宏会在系统初始化完成后自动调用pwm_entry函数。
- */
-app_run(pwm_entry);
+// /**
+//  * @brief 程序主入口
+//  * 
+//  * 通过app_run宏启动PWM演示应用程序。
+//  * 该宏会在系统初始化完成后自动调用pwm_entry函数。
+//  */
+// app_run(pwm_entry);

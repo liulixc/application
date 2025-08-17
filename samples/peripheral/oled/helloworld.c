@@ -37,6 +37,8 @@ void app_i2c_init_pin(void)
     uapi_pin_set_mode(CONFIG_I2C_SDA_MASTER_PIN, CONFIG_I2C_MASTER_PIN_MODE);
 }
 
+extern uint16_t voltage;
+static char g_templine[32] = {0};
 void OledTask(void)
 {
     uint32_t baudrate = I2C_SET_BANDRATE;
@@ -48,10 +50,30 @@ void OledTask(void)
     }
     ssd1306_Init();
     ssd1306_Fill(Black);
+
+    while(1)
+    {
+    sprintf(g_templine, "%d", voltage);
     ssd1306_SetCursor(0, 0);
-    ssd1306_DrawString("Hello World!!!", Font_7x10, White);
+    ssd1306_DrawString(g_templine, Font_7x10, White);
     ssd1306_UpdateScreen();
+    osal_msleep(100);
+    }
 }
+
+
+// void get_environment_task(environment_msg *msg)
+// {
+//     // temp_hum_chinese();
+//     ssd1306_set_cursor(32, 8); /* x坐标为32，y轴坐标为8 */
+
+//     sprintf(g_templine, "%.2f", msg->temperature);
+//     ssd1306_draw_string(g_templine, g_font_7x10, WHITE);
+//     ssd1306_set_cursor(32, 40); /* x坐标为32，y轴坐标为40 */
+//     // ssd1306_draw_string(g_humiline, g_font_7x10, WHITE);
+//     ssd1306_draw_string(g_currentline, g_font_7x10, WHITE);
+//     ssd1306_update_screen();
+// }
 
 void oled_entry(void)
 {

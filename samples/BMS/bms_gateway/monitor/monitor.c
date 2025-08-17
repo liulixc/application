@@ -225,14 +225,14 @@ static void *monitorTX_task(char *arg)
 
         static int loop_counter = 0;
         loop_counter++;
-        if (loop_counter % 5 == 0) {
+        if (loop_counter % 3 == 0) {
             for (int i = 2; i < 12; i++) {
                 is_device_active[i] = false;
             }
-            osal_msleep(500);
+
             loop_counter = 0; // 重置计数器
         }
-        osal_msleep(1000); // 每隔1秒发送一次数据
+        osal_msleep(3000); // 每隔1秒发送一次数据
     }
     return NULL;
 }
